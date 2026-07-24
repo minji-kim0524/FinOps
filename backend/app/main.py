@@ -1,5 +1,6 @@
 import pandas as pd
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,13 @@ from app.models import SalaryRecord
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="FinOps")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class SalaryInput(BaseModel):
