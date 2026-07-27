@@ -22,11 +22,12 @@ app.add_middleware(
 
 class SalaryInput(BaseModel):
     gross_pay: int
+    num_dependents: int = 1
 
 
 @app.post("/calculate")
 def calculate(input: SalaryInput, db: Session = Depends(get_db)):
-    df = pd.DataFrame([{"gross_pay": input.gross_pay}])
+    df = pd.DataFrame([{"gross_pay": input.gross_pay, "num_dependents": input.num_dependents}])
     result = {k: int(v) for k, v in calculate_net_pay(df).iloc[0].to_dict().items()}
 
     record = SalaryRecord(**result)
@@ -44,10 +45,13 @@ def list_records(db: Session = Depends(get_db)):
         {
             "id": r.id,
             "gross_pay": r.gross_pay,
+            "num_dependents": r.num_dependents,
             "national_pension": r.national_pension,
             "health_insurance": r.health_insurance,
             "long_term_care": r.long_term_care,
             "employment_insurance": r.employment_insurance,
+            "income_tax": r.income_tax,
+            "local_income_tax": r.local_income_tax,
             "total_deduction": r.total_deduction,
             "net_pay": r.net_pay,
         }

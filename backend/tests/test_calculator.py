@@ -4,7 +4,7 @@ from app.calculator import calculate_net_pay
 
 
 def test_calculate_net_pay_single_row():
-    df = pd.DataFrame([{"gross_pay": 3_000_000}])
+    df = pd.DataFrame([{"gross_pay": 3_000_000, "num_dependents": 1}])
 
     result = calculate_net_pay(df)
     row = result.iloc[0]
@@ -13,12 +13,33 @@ def test_calculate_net_pay_single_row():
     assert row["health_insurance"] == 106_350
     assert row["long_term_care"] == 13_772
     assert row["employment_insurance"] == 27_000
-    assert row["total_deduction"] == 282_122
-    assert row["net_pay"] == 2_717_878
+    assert row["income_tax"] == 95_000
+    assert row["local_income_tax"] == 9_500
+    assert row["total_deduction"] == 386_622
+    assert row["net_pay"] == 2_613_378
+
+
+def test_calculate_net_pay_more_dependents_reduces_income_tax():
+    df = pd.DataFrame(
+        [
+            {"gross_pay": 3_000_000, "num_dependents": 1},
+            {"gross_pay": 3_000_000, "num_dependents": 3},
+        ]
+    )
+
+    result = calculate_net_pay(df)
+
+    assert result.iloc[0]["income_tax"] > result.iloc[1]["income_tax"]
+    assert result.iloc[0]["net_pay"] < result.iloc[1]["net_pay"]
 
 
 def test_calculate_net_pay_multiple_rows():
-    df = pd.DataFrame([{"gross_pay": 2_000_000}, {"gross_pay": 5_000_000}])
+    df = pd.DataFrame(
+        [
+            {"gross_pay": 2_000_000, "num_dependents": 1},
+            {"gross_pay": 5_000_000, "num_dependents": 2},
+        ]
+    )
 
     result = calculate_net_pay(df)
 
