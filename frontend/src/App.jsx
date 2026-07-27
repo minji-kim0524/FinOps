@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import "./App.css";
 
 const API_BASE_URL = "http://localhost:8000";
 
 const FIELD_LABELS = {
+  employee_name: "직원명",
   gross_pay: "세전 급여",
   num_dependents: "부양가족 수",
   national_pension: "국민연금",
@@ -18,6 +19,9 @@ const FIELD_LABELS = {
 };
 
 function formatValue(field, value) {
+  if (field === "employee_name") {
+    return value || "-";
+  }
   if (field === "num_dependents") {
     return value + "명";
   }
@@ -25,10 +29,12 @@ function formatValue(field, value) {
 }
 
 function App() {
+  const [employeeName, setEmployeeName] = useState("");
   const [grossPay, setGrossPay] = useState("");
   const [numDependents, setNumDependents] = useState("1");
   const [records, setRecords] = useState([]);
   const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
 
   const fetchRecords = async () => {
     const response = await axios.get(`${API_BASE_URL}/records`);
@@ -44,9 +50,11 @@ function App() {
     setError(null);
     try {
       await axios.post(`${API_BASE_URL}/calculate`, {
+        employee_name: employeeName,
         gross_pay: Number(grossPay),
         num_dependents: Number(numDependents),
       });
+      setEmployeeName("");
       setGrossPay("");
       setNumDependents("1");
       await fetchRecords();
@@ -55,11 +63,35 @@ function App() {
     }
   };
 
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setError(null);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      await axios.post(`${API_BASE_URL}/calculate/bulk`, formData);
+      await fetchRecords();
+    } catch (err) {
+      setError("CSV 일괄 업로드에 실패했습니다.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="app">
       <h1>급여 실수령액 계산기</h1>
 
       <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={employeeName}
+          onChange={(e) => setEmployeeName(e.target.value)}
+          placeholder="직원명"
+        />
         <input
           type="number"
           value={grossPay}
@@ -77,6 +109,18 @@ function App() {
         />
         <button type="submit">계산하기</button>
       </form>
+
+      <div className="bulk-upload">
+        <label>
+          CSV 일괄 업로드 (employee_name, gross_pay, num_dependents 컬럼)
+          <input
+            type="file"
+            accept=".csv"
+            ref={fileInputRef}
+            onChange={handleBulkUpload}
+          />
+        </label>
+      </div>
 
       {error && <p className="error">{error}</p>}
 

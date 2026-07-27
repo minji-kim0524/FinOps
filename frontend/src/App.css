@@ -27,6 +27,17 @@ button {
   color: #d32f2f;
 }
 
+.bulk-upload {
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.bulk-upload label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
