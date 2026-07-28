@@ -5,9 +5,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./finops.db")
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# SQLite 전용 옵션. PostgreSQL 등 다른 DB로 연결할 때는 필요 없음.
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
