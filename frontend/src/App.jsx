@@ -1,40 +1,68 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { App as AntApp, Button, ConfigProvider, Form, Input, InputNumber, Table, Upload } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import "antd/dist/reset.css";
 import "./App.css";
 
 const API_BASE_URL = "http://localhost:8000";
 
-const FIELD_LABELS = {
-  employee_name: "직원명",
-  gross_pay: "세전 급여",
-  num_dependents: "부양가족 수",
-  national_pension: "국민연금",
-  health_insurance: "건강보험",
-  long_term_care: "장기요양보험",
-  employment_insurance: "고용보험",
-  income_tax: "소득세",
-  local_income_tax: "지방소득세",
-  total_deduction: "공제액 합계",
-  net_pay: "실수령액",
-};
-
-function formatValue(field, value) {
-  if (field === "employee_name") {
-    return value || "-";
-  }
-  if (field === "num_dependents") {
-    return value + "명";
-  }
+function formatWon(value) {
   return value.toLocaleString("ko-KR") + "원";
 }
 
-function App() {
-  const [employeeName, setEmployeeName] = useState("");
-  const [grossPay, setGrossPay] = useState("");
-  const [numDependents, setNumDependents] = useState("1");
+const numericColumn = (title, dataIndex) => ({
+  title,
+  dataIndex,
+  key: dataIndex,
+  align: "right",
+  sorter: (a, b) => a[dataIndex] - b[dataIndex],
+  render: formatWon,
+});
+
+const COLUMNS = [
+  {
+    title: "직원명",
+    dataIndex: "employee_name",
+    key: "employee_name",
+    sorter: (a, b) => a.employee_name.localeCompare(b.employee_name),
+    render: (value) => value || "-",
+  },
+  numericColumn("세전 급여", "gross_pay"),
+  {
+    title: "부양가족 수",
+    dataIndex: "num_dependents",
+    key: "num_dependents",
+    align: "right",
+    sorter: (a, b) => a.num_dependents - b.num_dependents,
+    render: (value) => value + "명",
+  },
+  numericColumn("국민연금", "national_pension"),
+  numericColumn("건강보험", "health_insurance"),
+  numericColumn("장기요양보험", "long_term_care"),
+  numericColumn("고용보험", "employment_insurance"),
+  numericColumn("소득세", "income_tax"),
+  numericColumn("지방소득세", "local_income_tax"),
+  numericColumn("공제액 합계", "total_deduction"),
+  numericColumn("실수령액", "net_pay"),
+];
+
+function AppContent() {
+  const { message } = AntApp.useApp();
+  const [form] = Form.useForm();
   const [records, setRecords] = useState([]);
-  const [error, setError] = useState(null);
-  const fileInputRef = useRef(null);
+  const [searchText, setSearchText] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const fetchRecords = async () => {
     const response = await axios.get(`${API_BASE_URL}/records`);
@@ -45,104 +73,118 @@ function App() {
     fetchRecords();
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
+  const handleSubmit = async (values) => {
     try {
       await axios.post(`${API_BASE_URL}/calculate`, {
-        employee_name: employeeName,
-        gross_pay: Number(grossPay),
-        num_dependents: Number(numDependents),
+        employee_name: values.employee_name || "",
+        gross_pay: values.gross_pay,
+        num_dependents: values.num_dependents,
       });
-      setEmployeeName("");
-      setGrossPay("");
-      setNumDependents("1");
+      form.resetFields();
+      form.setFieldsValue({ num_dependents: 1 });
       await fetchRecords();
+      message.success("계산이 완료되었습니다.");
     } catch (err) {
-      setError("계산 요청에 실패했습니다.");
+      message.error("계산 요청에 실패했습니다.");
     }
   };
 
-  const handleBulkUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setError(null);
+  const handleBulkUpload = async ({ file }) => {
+    setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      await axios.post(`${API_BASE_URL}/calculate/bulk`, formData);
+      const response = await axios.post(`${API_BASE_URL}/calculate/bulk`, formData);
       await fetchRecords();
+      message.success(`${response.data.length}건이 일괄 계산되었습니다.`);
     } catch (err) {
-      setError("CSV 일괄 업로드에 실패했습니다.");
+      message.error("CSV 일괄 업로드에 실패했습니다.");
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploading(false);
     }
   };
+
+  const filteredRecords = useMemo(
+    () =>
+      records.filter((record) =>
+        (record.employee_name || "").toLowerCase().includes(searchText.toLowerCase())
+      ),
+    [records, searchText]
+  );
 
   return (
     <div className="app">
       <h1>급여 실수령액 계산기</h1>
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          value={employeeName}
-          onChange={(e) => setEmployeeName(e.target.value)}
-          placeholder="직원명"
-        />
-        <input
-          type="number"
-          value={grossPay}
-          onChange={(e) => setGrossPay(e.target.value)}
-          placeholder="세전 급여를 입력하세요"
-          required
-        />
-        <input
-          type="number"
-          min="1"
-          value={numDependents}
-          onChange={(e) => setNumDependents(e.target.value)}
-          placeholder="부양가족 수"
-          required
-        />
-        <button type="submit">계산하기</button>
-      </form>
+      <Form form={form} layout="inline" onFinish={handleSubmit} initialValues={{ num_dependents: 1 }}>
+        <Form.Item name="employee_name">
+          <Input placeholder="직원명" />
+        </Form.Item>
+        <Form.Item name="gross_pay" rules={[{ required: true, message: "세전 급여를 입력하세요" }]}>
+          <InputNumber placeholder="세전 급여" min={0} style={{ width: 160 }} />
+        </Form.Item>
+        <Form.Item name="num_dependents" rules={[{ required: true, message: "부양가족 수를 입력하세요" }]}>
+          <InputNumber placeholder="부양가족 수" min={1} style={{ width: 120 }} />
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" htmlType="submit">
+            계산하기
+          </Button>
+        </Form.Item>
+      </Form>
 
       <div className="bulk-upload">
-        <label>
-          CSV 일괄 업로드 (employee_name, gross_pay, num_dependents 컬럼)
-          <input
-            type="file"
-            accept=".csv"
-            ref={fileInputRef}
-            onChange={handleBulkUpload}
-          />
-        </label>
+        <Upload
+          accept=".csv"
+          showUploadList={false}
+          customRequest={handleBulkUpload}
+          disabled={uploading}
+        >
+          <Button icon={<UploadOutlined />} loading={uploading}>
+            CSV 일괄 업로드 (employee_name, gross_pay, num_dependents 컬럼)
+          </Button>
+        </Upload>
       </div>
 
-      {error && <p className="error">{error}</p>}
+      <Input.Search
+        placeholder="직원명으로 검색"
+        allowClear
+        onChange={(e) => setSearchText(e.target.value)}
+        style={{ maxWidth: 300, marginBottom: 16 }}
+      />
 
-      <table>
-        <thead>
-          <tr>
-            {Object.values(FIELD_LABELS).map((label) => (
-              <th key={label}>{label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((record) => (
-            <tr key={record.id}>
-              {Object.keys(FIELD_LABELS).map((field) => (
-                <td key={field}>{formatValue(field, record[field])}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Table
+        dataSource={filteredRecords}
+        columns={COLUMNS}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: true }}
+      />
+
+      <h2>세전 급여 vs 실수령액</h2>
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart data={filteredRecords}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="employee_name" />
+          <YAxis tickFormatter={(value) => (value / 10000).toLocaleString() + "만"} />
+          <Tooltip formatter={(value) => formatWon(value)} />
+          <Legend />
+          <Bar dataKey="gross_pay" name="세전 급여" fill="#8884d8" />
+          <Bar dataKey="net_pay" name="실수령액" fill="#82ca9d" />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ConfigProvider>
+      <AntApp>
+        <AppContent />
+      </AntApp>
+    </ConfigProvider>
   );
 }
 
