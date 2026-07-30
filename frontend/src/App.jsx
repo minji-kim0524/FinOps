@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { App as AntApp, Button, ConfigProvider, Form, Input, InputNumber, Table, Upload } from "antd";
+import {
+  App as AntApp,
+  Button,
+  ConfigProvider,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Space,
+  Table,
+  Upload,
+} from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import {
   Bar,
@@ -30,39 +42,65 @@ const numericColumn = (title, dataIndex) => ({
   render: formatWon,
 });
 
-const COLUMNS = [
-  {
-    title: "직원명",
-    dataIndex: "employee_name",
-    key: "employee_name",
-    sorter: (a, b) => a.employee_name.localeCompare(b.employee_name),
-    render: (value) => value || "-",
-  },
-  numericColumn("세전 급여", "gross_pay"),
-  {
-    title: "부양가족 수",
-    dataIndex: "num_dependents",
-    key: "num_dependents",
-    align: "right",
-    sorter: (a, b) => a.num_dependents - b.num_dependents,
-    render: (value) => value + "명",
-  },
-  numericColumn("국민연금", "national_pension"),
-  numericColumn("건강보험", "health_insurance"),
-  numericColumn("장기요양보험", "long_term_care"),
-  numericColumn("고용보험", "employment_insurance"),
-  numericColumn("소득세", "income_tax"),
-  numericColumn("지방소득세", "local_income_tax"),
-  numericColumn("공제액 합계", "total_deduction"),
-  numericColumn("실수령액", "net_pay"),
-];
+function buildColumns({ onEdit, onDelete }) {
+  return [
+    {
+      title: "직원명",
+      dataIndex: "employee_name",
+      key: "employee_name",
+      sorter: (a, b) => a.employee_name.localeCompare(b.employee_name),
+      render: (value) => value || "-",
+    },
+    numericColumn("세전 급여", "gross_pay"),
+    {
+      title: "부양가족 수",
+      dataIndex: "num_dependents",
+      key: "num_dependents",
+      align: "right",
+      sorter: (a, b) => a.num_dependents - b.num_dependents,
+      render: (value) => value + "명",
+    },
+    numericColumn("국민연금", "national_pension"),
+    numericColumn("건강보험", "health_insurance"),
+    numericColumn("장기요양보험", "long_term_care"),
+    numericColumn("고용보험", "employment_insurance"),
+    numericColumn("소득세", "income_tax"),
+    numericColumn("지방소득세", "local_income_tax"),
+    numericColumn("공제액 합계", "total_deduction"),
+    numericColumn("실수령액", "net_pay"),
+    {
+      title: "관리",
+      key: "actions",
+      fixed: "right",
+      render: (_, record) => (
+        <Space>
+          <Button size="small" onClick={() => onEdit(record)}>
+            수정
+          </Button>
+          <Popconfirm
+            title="이 계산 이력을 삭제하시겠습니까?"
+            onConfirm={() => onDelete(record.id)}
+            okText="삭제"
+            cancelText="취소"
+          >
+            <Button size="small" danger>
+              삭제
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+}
 
 function AppContent() {
   const { message } = AntApp.useApp();
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [records, setRecords] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
 
   const fetchRecords = async () => {
     const response = await axios.get(`${API_BASE_URL}/records`);
@@ -104,6 +142,45 @@ function AppContent() {
       setUploading(false);
     }
   };
+
+  const openEditModal = (record) => {
+    setEditingRecord(record);
+    editForm.setFieldsValue({
+      employee_name: record.employee_name,
+      gross_pay: record.gross_pay,
+      num_dependents: record.num_dependents,
+    });
+  };
+
+  const handleEditSubmit = async (values) => {
+    try {
+      await axios.put(`${API_BASE_URL}/records/${editingRecord.id}`, {
+        employee_name: values.employee_name || "",
+        gross_pay: values.gross_pay,
+        num_dependents: values.num_dependents,
+      });
+      setEditingRecord(null);
+      await fetchRecords();
+      message.success("수정되었습니다.");
+    } catch (err) {
+      message.error("수정에 실패했습니다.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/records/${id}`);
+      await fetchRecords();
+      message.success("삭제되었습니다.");
+    } catch (err) {
+      message.error("삭제에 실패했습니다.");
+    }
+  };
+
+  const columns = useMemo(
+    () => buildColumns({ onEdit: openEditModal, onDelete: handleDelete }),
+    []
+  );
 
   const filteredRecords = useMemo(
     () =>
@@ -156,7 +233,7 @@ function AppContent() {
 
       <Table
         dataSource={filteredRecords}
-        columns={COLUMNS}
+        columns={columns}
         rowKey="id"
         pagination={{ pageSize: 10 }}
         scroll={{ x: true }}
@@ -174,6 +251,35 @@ function AppContent() {
           <Bar dataKey="net_pay" name="실수령액" fill="#82ca9d" />
         </BarChart>
       </ResponsiveContainer>
+
+      <Modal
+        title="계산 이력 수정"
+        open={!!editingRecord}
+        onCancel={() => setEditingRecord(null)}
+        onOk={() => editForm.submit()}
+        okText="저장"
+        cancelText="취소"
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
+          <Form.Item name="employee_name" label="직원명">
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="gross_pay"
+            label="세전 급여"
+            rules={[{ required: true, message: "세전 급여를 입력하세요" }]}
+          >
+            <InputNumber style={{ width: "100%" }} min={0} />
+          </Form.Item>
+          <Form.Item
+            name="num_dependents"
+            label="부양가족 수"
+            rules={[{ required: true, message: "부양가족 수를 입력하세요" }]}
+          >
+            <InputNumber style={{ width: "100%" }} min={1} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

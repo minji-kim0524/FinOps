@@ -66,3 +66,45 @@ def test_calculate_bulk_endpoint_defaults_missing_columns(client):
     record = response.json()[0]
     assert record["employee_name"] == ""
     assert record["num_dependents"] == 1
+
+
+def test_update_record_recalculates_values(client):
+    created = client.post(
+        "/calculate", json={"employee_name": "홍길동", "gross_pay": 3_000_000, "num_dependents": 1}
+    ).json()
+
+    response = client.put(
+        f"/records/{created['id']}",
+        json={"employee_name": "홍길동", "gross_pay": 5_000_000, "num_dependents": 2},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == created["id"]
+    assert body["gross_pay"] == 5_000_000
+    assert body["net_pay"] == 4_256_996
+
+    saved = client.get("/records").json()
+    assert len(saved) == 1
+    assert saved[0]["gross_pay"] == 5_000_000
+
+
+def test_update_record_not_found(client):
+    response = client.put("/records/999", json={"gross_pay": 3_000_000})
+
+    assert response.status_code == 404
+
+
+def test_delete_record(client):
+    created = client.post("/calculate", json={"gross_pay": 3_000_000}).json()
+
+    response = client.delete(f"/records/{created['id']}")
+
+    assert response.status_code == 200
+    assert client.get("/records").json() == []
+
+
+def test_delete_record_not_found(client):
+    response = client.delete("/records/999")
+
+    assert response.status_code == 404

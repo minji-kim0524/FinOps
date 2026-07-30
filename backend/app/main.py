@@ -1,7 +1,7 @@
 import io
 
 import pandas as pd
-from fastapi import Depends, FastAPI, File, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -45,29 +45,40 @@ def _serialize(record: SalaryRecord) -> dict:
     }
 
 
+def _apply_calculated_fields(record: SalaryRecord, row: dict) -> None:
+    record.employee_name = str(row.get("employee_name", ""))
+    record.gross_pay = int(row["gross_pay"])
+    record.num_dependents = int(row["num_dependents"])
+    record.national_pension = int(row["national_pension"])
+    record.health_insurance = int(row["health_insurance"])
+    record.long_term_care = int(row["long_term_care"])
+    record.employment_insurance = int(row["employment_insurance"])
+    record.income_tax = int(row["income_tax"])
+    record.local_income_tax = int(row["local_income_tax"])
+    record.total_deduction = int(row["total_deduction"])
+    record.net_pay = int(row["net_pay"])
+
+
 def _save_calculated(df: pd.DataFrame, db: Session) -> list[SalaryRecord]:
     result_df = calculate_net_pay(df)
 
-    records = [
-        SalaryRecord(
-            employee_name=str(row.get("employee_name", "")),
-            gross_pay=int(row["gross_pay"]),
-            num_dependents=int(row["num_dependents"]),
-            national_pension=int(row["national_pension"]),
-            health_insurance=int(row["health_insurance"]),
-            long_term_care=int(row["long_term_care"]),
-            employment_insurance=int(row["employment_insurance"]),
-            income_tax=int(row["income_tax"]),
-            local_income_tax=int(row["local_income_tax"]),
-            total_deduction=int(row["total_deduction"]),
-            net_pay=int(row["net_pay"]),
-        )
-        for row in result_df.to_dict("records")
-    ]
+    records = []
+    for row in result_df.to_dict("records"):
+        record = SalaryRecord()
+        _apply_calculated_fields(record, row)
+        records.append(record)
+
     db.add_all(records)
     db.commit()
 
     return records
+
+
+def _get_record_or_404(record_id: int, db: Session) -> SalaryRecord:
+    record = db.get(SalaryRecord, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return record
 
 
 @app.post("/calculate")
@@ -95,3 +106,25 @@ async def calculate_bulk(file: UploadFile = File(...), db: Session = Depends(get
 def list_records(db: Session = Depends(get_db)):
     records = db.query(SalaryRecord).order_by(SalaryRecord.id).all()
     return [_serialize(record) for record in records]
+
+
+@app.put("/records/{record_id}")
+def update_record(record_id: int, input: SalaryInput, db: Session = Depends(get_db)):
+    record = _get_record_or_404(record_id, db)
+
+    df = pd.DataFrame([input.model_dump()])
+    row = calculate_net_pay(df).iloc[0].to_dict()
+    _apply_calculated_fields(record, row)
+
+    db.commit()
+    db.refresh(record)
+    return _serialize(record)
+
+
+@app.delete("/records/{record_id}")
+def delete_record(record_id: int, db: Session = Depends(get_db)):
+    record = _get_record_or_404(record_id, db)
+
+    db.delete(record)
+    db.commit()
+    return {"id": record_id}
