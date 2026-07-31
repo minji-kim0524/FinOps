@@ -70,12 +70,12 @@ def _apply_calculated_fields(record: SalaryRecord, row: dict) -> None:
     record.net_pay = int(row["net_pay"])
 
 
-def _save_calculated(df: pd.DataFrame, db: Session) -> list[SalaryRecord]:
+def _save_calculated(df: pd.DataFrame, db: Session, owner_id: int) -> list[SalaryRecord]:
     result_df = calculate_net_pay(df)
 
     records = []
     for row in result_df.to_dict("records"):
-        record = SalaryRecord()
+        record = SalaryRecord(owner_id=owner_id)
         _apply_calculated_fields(record, row)
         records.append(record)
 
@@ -85,8 +85,12 @@ def _save_calculated(df: pd.DataFrame, db: Session) -> list[SalaryRecord]:
     return records
 
 
-def _get_record_or_404(record_id: int, db: Session) -> SalaryRecord:
-    record = db.get(SalaryRecord, record_id)
+def _get_record_or_404(record_id: int, owner_id: int, db: Session) -> SalaryRecord:
+    record = (
+        db.query(SalaryRecord)
+        .filter(SalaryRecord.id == record_id, SalaryRecord.owner_id == owner_id)
+        .first()
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return record
@@ -118,7 +122,7 @@ def calculate(
     input: SalaryInput, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     df = pd.DataFrame([input.model_dump()])
-    record = _save_calculated(df, db)[0]
+    record = _save_calculated(df, db, current_user.id)[0]
     return _serialize(record)
 
 
@@ -136,13 +140,18 @@ async def calculate_bulk(
     if "employee_name" not in df.columns:
         df["employee_name"] = ""
 
-    records = _save_calculated(df, db)
+    records = _save_calculated(df, db, current_user.id)
     return [_serialize(record) for record in records]
 
 
 @app.get("/records")
 def list_records(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = db.query(SalaryRecord).order_by(SalaryRecord.id).all()
+    records = (
+        db.query(SalaryRecord)
+        .filter(SalaryRecord.owner_id == current_user.id)
+        .order_by(SalaryRecord.id)
+        .all()
+    )
     return [_serialize(record) for record in records]
 
 
@@ -153,7 +162,7 @@ def update_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    record = _get_record_or_404(record_id, db)
+    record = _get_record_or_404(record_id, current_user.id, db)
 
     df = pd.DataFrame([input.model_dump()])
     row = calculate_net_pay(df).iloc[0].to_dict()
@@ -168,7 +177,7 @@ def update_record(
 def delete_record(
     record_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    record = _get_record_or_404(record_id, db)
+    record = _get_record_or_404(record_id, current_user.id, db)
 
     db.delete(record)
     db.commit()

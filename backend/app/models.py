@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, ForeignKey, Integer, String
 
 from app.database import Base
 
@@ -15,6 +15,7 @@ class SalaryRecord(Base):
     __tablename__ = "salary_records"
 
     id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     employee_name = Column(String, nullable=False, default="")
     gross_pay = Column(Integer, nullable=False)
     num_dependents = Column(Integer, nullable=False)
