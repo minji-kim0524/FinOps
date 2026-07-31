@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   App as AntApp,
   Button,
@@ -26,8 +25,8 @@ import {
 } from "recharts";
 import "antd/dist/reset.css";
 import "./App.css";
-
-const API_BASE_URL = "http://localhost:8000";
+import api from "./api";
+import LoginPage from "./LoginPage";
 
 function formatWon(value) {
   return value.toLocaleString("ko-KR") + "원";
@@ -93,7 +92,7 @@ function buildColumns({ onEdit, onDelete }) {
   ];
 }
 
-function AppContent() {
+function AppContent({ onLogout }) {
   const { message } = AntApp.useApp();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -102,9 +101,22 @@ function AppContent() {
   const [uploading, setUploading] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
 
+  const reportError = (err, fallbackMessage) => {
+    if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+      message.error("로그인이 만료되었습니다. 다시 로그인해주세요.");
+      onLogout();
+    } else {
+      message.error(fallbackMessage);
+    }
+  };
+
   const fetchRecords = async () => {
-    const response = await axios.get(`${API_BASE_URL}/records`);
-    setRecords(response.data);
+    try {
+      const response = await api.get("/records");
+      setRecords(response.data);
+    } catch (err) {
+      reportError(err, "계산 이력을 불러오지 못했습니다.");
+    }
   };
 
   useEffect(() => {
@@ -113,7 +125,7 @@ function AppContent() {
 
   const handleSubmit = async (values) => {
     try {
-      await axios.post(`${API_BASE_URL}/calculate`, {
+      await api.post("/calculate", {
         employee_name: values.employee_name || "",
         gross_pay: values.gross_pay,
         num_dependents: values.num_dependents,
@@ -123,7 +135,7 @@ function AppContent() {
       await fetchRecords();
       message.success("계산이 완료되었습니다.");
     } catch (err) {
-      message.error("계산 요청에 실패했습니다.");
+      reportError(err, "계산 요청에 실패했습니다.");
     }
   };
 
@@ -133,11 +145,11 @@ function AppContent() {
     formData.append("file", file);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/calculate/bulk`, formData);
+      const response = await api.post("/calculate/bulk", formData);
       await fetchRecords();
       message.success(`${response.data.length}건이 일괄 계산되었습니다.`);
     } catch (err) {
-      message.error("CSV 일괄 업로드에 실패했습니다.");
+      reportError(err, "CSV 일괄 업로드에 실패했습니다.");
     } finally {
       setUploading(false);
     }
@@ -154,7 +166,7 @@ function AppContent() {
 
   const handleEditSubmit = async (values) => {
     try {
-      await axios.put(`${API_BASE_URL}/records/${editingRecord.id}`, {
+      await api.put(`/records/${editingRecord.id}`, {
         employee_name: values.employee_name || "",
         gross_pay: values.gross_pay,
         num_dependents: values.num_dependents,
@@ -163,17 +175,17 @@ function AppContent() {
       await fetchRecords();
       message.success("수정되었습니다.");
     } catch (err) {
-      message.error("수정에 실패했습니다.");
+      reportError(err, "수정에 실패했습니다.");
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_BASE_URL}/records/${id}`);
+      await api.delete(`/records/${id}`);
       await fetchRecords();
       message.success("삭제되었습니다.");
     } catch (err) {
-      message.error("삭제에 실패했습니다.");
+      reportError(err, "삭제에 실패했습니다.");
     }
   };
 
@@ -192,7 +204,10 @@ function AppContent() {
 
   return (
     <div className="app">
-      <h1>급여 실수령액 계산기</h1>
+      <div className="app-header">
+        <h1>급여 실수령액 계산기</h1>
+        <Button onClick={onLogout}>로그아웃</Button>
+      </div>
 
       <Form form={form} layout="inline" onFinish={handleSubmit} initialValues={{ num_dependents: 1 }}>
         <Form.Item name="employee_name">
@@ -285,10 +300,22 @@ function AppContent() {
 }
 
 function App() {
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+
+  const handleLogin = (newToken) => {
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+  };
+
   return (
     <ConfigProvider>
       <AntApp>
-        <AppContent />
+        {token ? <AppContent onLogout={handleLogout} /> : <LoginPage onLogin={handleLogin} />}
       </AntApp>
     </ConfigProvider>
   );

@@ -4,5 +4,7 @@ pandas
 sqlalchemy
 psycopg2-binary
 python-multipart
+bcrypt
+pyjwt
 pytest
 httpx

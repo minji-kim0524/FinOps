@@ -14,6 +14,9 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+TEST_USERNAME = "tester"
+TEST_PASSWORD = "testpass123"
+
 
 @pytest.fixture()
 def client():
@@ -28,7 +31,14 @@ def client():
 
     app.dependency_overrides[get_db] = override_get_db
 
-    yield TestClient(app)
+    test_client = TestClient(app)
+    test_client.post("/auth/register", json={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    token = test_client.post(
+        "/auth/login", json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+    ).json()["access_token"]
+    test_client.headers.update({"Authorization": f"Bearer {token}"})
+
+    yield test_client
 
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)

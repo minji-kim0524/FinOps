@@ -5,6 +5,20 @@
   text-align: left;
 }
 
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .bulk-upload {
   margin: 16px 0;
+}
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 20px;
 }

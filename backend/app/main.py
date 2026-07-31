@@ -6,9 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.calculator import calculate_net_pay
 from app.database import Base, engine, get_db
-from app.models import SalaryRecord
+from app.models import SalaryRecord, User
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,6 +27,16 @@ class SalaryInput(BaseModel):
     gross_pay: int
     num_dependents: int = 1
     employee_name: str = ""
+
+
+class AuthInput(BaseModel):
+    username: str
+    password: str
+
+
+class TokenOutput(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 
 def _serialize(record: SalaryRecord) -> dict:
@@ -81,15 +92,42 @@ def _get_record_or_404(record_id: int, db: Session) -> SalaryRecord:
     return record
 
 
+@app.post("/auth/register", response_model=TokenOutput)
+def register(input: AuthInput, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.username == input.username).first() is not None:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    user = User(username=input.username, hashed_password=hash_password(input.password))
+    db.add(user)
+    db.commit()
+
+    return TokenOutput(access_token=create_access_token(user.username))
+
+
+@app.post("/auth/login", response_model=TokenOutput)
+def login(input: AuthInput, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == input.username).first()
+    if user is None or not verify_password(input.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    return TokenOutput(access_token=create_access_token(user.username))
+
+
 @app.post("/calculate")
-def calculate(input: SalaryInput, db: Session = Depends(get_db)):
+def calculate(
+    input: SalaryInput, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     df = pd.DataFrame([input.model_dump()])
     record = _save_calculated(df, db)[0]
     return _serialize(record)
 
 
 @app.post("/calculate/bulk")
-async def calculate_bulk(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def calculate_bulk(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     content = await file.read()
     df = pd.read_csv(io.BytesIO(content))
 
@@ -103,13 +141,18 @@ async def calculate_bulk(file: UploadFile = File(...), db: Session = Depends(get
 
 
 @app.get("/records")
-def list_records(db: Session = Depends(get_db)):
+def list_records(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     records = db.query(SalaryRecord).order_by(SalaryRecord.id).all()
     return [_serialize(record) for record in records]
 
 
 @app.put("/records/{record_id}")
-def update_record(record_id: int, input: SalaryInput, db: Session = Depends(get_db)):
+def update_record(
+    record_id: int,
+    input: SalaryInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     record = _get_record_or_404(record_id, db)
 
     df = pd.DataFrame([input.model_dump()])
@@ -122,7 +165,9 @@ def update_record(record_id: int, input: SalaryInput, db: Session = Depends(get_
 
 
 @app.delete("/records/{record_id}")
-def delete_record(record_id: int, db: Session = Depends(get_db)):
+def delete_record(
+    record_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     record = _get_record_or_404(record_id, db)
 
     db.delete(record)
