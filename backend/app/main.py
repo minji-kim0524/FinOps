@@ -1,4 +1,5 @@
 import io
+import os
 
 import pandas as pd
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -15,12 +16,19 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="FinOps")
 
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 
 class SalaryInput(BaseModel):
