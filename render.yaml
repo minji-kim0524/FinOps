@@ -17,10 +17,8 @@ services:
           property: connectionString
       - key: JWT_SECRET_KEY
         generateValue: true
-      # 첫 배포 후 finops-frontend에 실제로 할당된 URL로 값을 교체하세요.
-      # (서비스 이름이 겹치면 Render가 임의 접미사를 붙일 수 있습니다.)
       - key: CORS_ORIGINS
-        value: https://finops-frontend.onrender.com
+        value: https://finops-frontend-46sh.onrender.com
 
   - type: web
     name: finops-frontend
@@ -29,6 +27,5 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     envVars:
-      # 첫 배포 후 finops-backend에 실제로 할당된 URL로 값을 교체하고 재배포하세요.
       - key: VITE_API_BASE_URL
-        value: https://finops-backend.onrender.com
+        value: https://finops-backend-scd8.onrender.com
