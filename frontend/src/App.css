@@ -15,6 +15,10 @@
   margin: 16px 0;
 }
 
+.app :where(.ant-table-thead > tr > th, .ant-table-tbody > tr > td) {
+  white-space: nowrap;
+}
+
 .login-page {
   display: flex;
   align-items: center;
