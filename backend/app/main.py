@@ -4,6 +4,7 @@ import os
 import pandas as pd
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -45,6 +46,21 @@ class AuthInput(BaseModel):
 class TokenOutput(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+EXPORT_COLUMN_LABELS = {
+    "employee_name": "직원명",
+    "gross_pay": "세전 급여",
+    "num_dependents": "부양가족 수",
+    "national_pension": "국민연금",
+    "health_insurance": "건강보험",
+    "long_term_care": "장기요양보험",
+    "employment_insurance": "고용보험",
+    "income_tax": "소득세",
+    "local_income_tax": "지방소득세",
+    "total_deduction": "공제액 합계",
+    "net_pay": "실수령액",
+}
 
 
 def _serialize(record: SalaryRecord) -> dict:
@@ -161,6 +177,32 @@ def list_records(db: Session = Depends(get_db), current_user: User = Depends(get
         .all()
     )
     return [_serialize(record) for record in records]
+
+
+@app.get("/records/export")
+def export_records(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    records = (
+        db.query(SalaryRecord)
+        .filter(SalaryRecord.owner_id == current_user.id)
+        .order_by(SalaryRecord.id)
+        .all()
+    )
+
+    rows = [_serialize(record) for record in records]
+    columns = list(EXPORT_COLUMN_LABELS.keys())
+    df = pd.DataFrame(rows, columns=["id"] + columns) if rows else pd.DataFrame(columns=["id"] + columns)
+    df = df[columns].rename(columns=EXPORT_COLUMN_LABELS)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="급여 이력")
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=salary_records.xlsx"},
+    )
 
 
 @app.put("/records/{record_id}")

@@ -12,7 +12,7 @@ import {
   Table,
   Upload,
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Bar,
   BarChart,
@@ -103,6 +103,7 @@ function AppContent({ onLogout }) {
   const [records, setRecords] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
 
   const reportError = (err, fallbackMessage) => {
@@ -156,6 +157,25 @@ function AppContent({ onLogout }) {
       reportError(err, "CSV 일괄 업로드에 실패했습니다.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await api.get("/records/export", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "salary_records.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      reportError(err, "엑셀 다운로드에 실패했습니다.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -241,6 +261,9 @@ function AppContent({ onLogout }) {
             CSV 일괄 업로드 (employee_name, gross_pay, num_dependents 컬럼)
           </Button>
         </Upload>
+        <Button icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>
+          엑셀로 내보내기
+        </Button>
       </div>
 
       <Input.Search
