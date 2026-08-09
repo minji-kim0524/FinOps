@@ -42,6 +42,15 @@ const numericColumn = (title, dataIndex, width = 120) => ({
   render: formatWon,
 });
 
+const SUMMARY_COLUMNS = [
+  { title: "월", dataIndex: "month", key: "month" },
+  { title: "계산 건수", dataIndex: "count", key: "count", align: "right", render: (v) => v + "건" },
+  { title: "총 세전 급여", dataIndex: "total_gross_pay", key: "total_gross_pay", align: "right", render: formatWon },
+  { title: "총 공제액", dataIndex: "total_deduction", key: "total_deduction", align: "right", render: formatWon },
+  { title: "총 실수령액", dataIndex: "total_net_pay", key: "total_net_pay", align: "right", render: formatWon },
+  { title: "평균 실수령액", dataIndex: "avg_net_pay", key: "avg_net_pay", align: "right", render: formatWon },
+];
+
 function buildColumns({ onEdit, onDelete }) {
   return [
     {
@@ -101,6 +110,7 @@ function AppContent({ onLogout }) {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [records, setRecords] = useState([]);
+  const [summary, setSummary] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -124,8 +134,21 @@ function AppContent({ onLogout }) {
     }
   };
 
+  const fetchSummary = async () => {
+    try {
+      const response = await api.get("/records/summary");
+      setSummary(response.data);
+    } catch (err) {
+      reportError(err, "월별 집계를 불러오지 못했습니다.");
+    }
+  };
+
+  const refreshAll = async () => {
+    await Promise.all([fetchRecords(), fetchSummary()]);
+  };
+
   useEffect(() => {
-    fetchRecords();
+    refreshAll();
   }, []);
 
   const handleSubmit = async (values) => {
@@ -137,7 +160,7 @@ function AppContent({ onLogout }) {
       });
       form.resetFields();
       form.setFieldsValue({ num_dependents: 1 });
-      await fetchRecords();
+      await refreshAll();
       message.success("계산이 완료되었습니다.");
     } catch (err) {
       reportError(err, "계산 요청에 실패했습니다.");
@@ -151,7 +174,7 @@ function AppContent({ onLogout }) {
 
     try {
       const response = await api.post("/calculate/bulk", formData);
-      await fetchRecords();
+      await refreshAll();
       message.success(`${response.data.length}건이 일괄 계산되었습니다.`);
     } catch (err) {
       reportError(err, "CSV 일괄 업로드에 실패했습니다.");
@@ -196,7 +219,7 @@ function AppContent({ onLogout }) {
         num_dependents: values.num_dependents,
       });
       setEditingRecord(null);
-      await fetchRecords();
+      await refreshAll();
       message.success("수정되었습니다.");
     } catch (err) {
       reportError(err, "수정에 실패했습니다.");
@@ -206,7 +229,7 @@ function AppContent({ onLogout }) {
   const handleDelete = async (id) => {
     try {
       await api.delete(`/records/${id}`);
-      await fetchRecords();
+      await refreshAll();
       message.success("삭제되었습니다.");
     } catch (err) {
       reportError(err, "삭제에 실패했습니다.");
@@ -293,6 +316,15 @@ function AppContent({ onLogout }) {
           <Bar dataKey="net_pay" name="실수령액" fill="#82ca9d" />
         </BarChart>
       </ResponsiveContainer>
+
+      <h2>월별 집계</h2>
+      <Table
+        dataSource={summary}
+        columns={SUMMARY_COLUMNS}
+        rowKey="month"
+        pagination={false}
+        scroll={{ x: "max-content" }}
+      />
 
       <Modal
         title="계산 이력 수정"

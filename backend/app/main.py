@@ -205,6 +205,47 @@ def export_records(db: Session = Depends(get_db), current_user: User = Depends(g
     )
 
 
+@app.get("/records/summary")
+def monthly_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    records = (
+        db.query(SalaryRecord)
+        .filter(SalaryRecord.owner_id == current_user.id)
+        .order_by(SalaryRecord.created_at)
+        .all()
+    )
+
+    if not records:
+        return []
+
+    df = pd.DataFrame(
+        [
+            {
+                "month": record.created_at.strftime("%Y-%m"),
+                "gross_pay": record.gross_pay,
+                "total_deduction": record.total_deduction,
+                "net_pay": record.net_pay,
+            }
+            for record in records
+        ]
+    )
+
+    summary = (
+        df.groupby("month")
+        .agg(
+            count=("net_pay", "size"),
+            total_gross_pay=("gross_pay", "sum"),
+            total_deduction=("total_deduction", "sum"),
+            total_net_pay=("net_pay", "sum"),
+            avg_net_pay=("net_pay", "mean"),
+        )
+        .reset_index()
+        .sort_values("month")
+    )
+    summary["avg_net_pay"] = summary["avg_net_pay"].round().astype(int)
+
+    return summary.to_dict("records")
+
+
 @app.put("/records/{record_id}")
 def update_record(
     record_id: int,
