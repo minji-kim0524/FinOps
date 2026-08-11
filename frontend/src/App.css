@@ -5,6 +5,13 @@
   text-align: left;
 }
 
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+}
+
 .app-header {
   display: flex;
   align-items: center;

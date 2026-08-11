@@ -10,9 +10,10 @@ import {
   Popconfirm,
   Space,
   Table,
+  theme as antdTheme,
   Upload,
 } from "antd";
-import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, MoonOutlined, SunOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Bar,
   BarChart,
@@ -358,8 +359,25 @@ function AppContent({ onLogout }) {
   );
 }
 
+function useTheme() {
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem("theme");
+    if (stored === "light" || stored === "dark") return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  return [theme, setTheme];
+}
+
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [theme, setTheme] = useTheme();
+  const isDark = theme === "dark";
 
   const handleLogin = (newToken) => {
     localStorage.setItem("token", newToken);
@@ -372,8 +390,17 @@ function App() {
   };
 
   return (
-    <ConfigProvider>
+    <ConfigProvider
+      theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}
+    >
       <AntApp>
+        <Button
+          className="theme-toggle"
+          shape="circle"
+          icon={isDark ? <SunOutlined /> : <MoonOutlined />}
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+          aria-label="테마 전환"
+        />
         {token ? <AppContent onLogout={handleLogout} /> : <LoginPage onLogin={handleLogin} />}
       </AntApp>
     </ConfigProvider>
