@@ -43,6 +43,11 @@ class AuthInput(BaseModel):
     password: str
 
 
+class ChangePasswordInput(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class TokenOutput(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -139,6 +144,21 @@ def login(input: AuthInput, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     return TokenOutput(access_token=create_access_token(user.username))
+
+
+@app.put("/auth/password")
+def change_password(
+    input: ChangePasswordInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(input.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    current_user.hashed_password = hash_password(input.new_password)
+    db.commit()
+
+    return {"status": "ok"}
 
 
 @app.post("/calculate")

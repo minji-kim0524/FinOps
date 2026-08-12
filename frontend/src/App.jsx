@@ -110,12 +110,15 @@ function AppContent({ onLogout }) {
   const { message } = AntApp.useApp();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+  const [passwordForm] = Form.useForm();
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const reportError = (err, fallbackMessage) => {
     if (err.response && (err.response.status === 401 || err.response.status === 403)) {
@@ -227,6 +230,27 @@ function AppContent({ onLogout }) {
     }
   };
 
+  const handleChangePassword = async (values) => {
+    setChangingPassword(true);
+    try {
+      await api.put("/auth/password", {
+        current_password: values.current_password,
+        new_password: values.new_password,
+      });
+      setPasswordModalOpen(false);
+      passwordForm.resetFields();
+      message.success("비밀번호가 변경되었습니다.");
+    } catch (err) {
+      if (err.response?.status === 400) {
+        message.error("현재 비밀번호가 올바르지 않습니다.");
+      } else {
+        reportError(err, "비밀번호 변경에 실패했습니다.");
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     try {
       await api.delete(`/records/${id}`);
@@ -254,7 +278,10 @@ function AppContent({ onLogout }) {
     <div className="app">
       <div className="app-header">
         <h1>급여 실수령액 계산기</h1>
-        <Button onClick={onLogout}>로그아웃</Button>
+        <Space>
+          <Button onClick={() => setPasswordModalOpen(true)}>비밀번호 변경</Button>
+          <Button onClick={onLogout}>로그아웃</Button>
+        </Space>
       </div>
 
       <Form form={form} layout="inline" onFinish={handleSubmit} initialValues={{ num_dependents: 1 }}>
@@ -352,6 +379,54 @@ function AppContent({ onLogout }) {
             rules={[{ required: true, message: "부양가족 수를 입력하세요" }]}
           >
             <InputNumber style={{ width: "100%" }} min={1} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="비밀번호 변경"
+        open={passwordModalOpen}
+        onCancel={() => {
+          setPasswordModalOpen(false);
+          passwordForm.resetFields();
+        }}
+        onOk={() => passwordForm.submit()}
+        okText="변경"
+        cancelText="취소"
+        confirmLoading={changingPassword}
+      >
+        <Form form={passwordForm} layout="vertical" onFinish={handleChangePassword}>
+          <Form.Item
+            name="current_password"
+            label="현재 비밀번호"
+            rules={[{ required: true, message: "현재 비밀번호를 입력하세요" }]}
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item
+            name="new_password"
+            label="새 비밀번호"
+            rules={[{ required: true, message: "새 비밀번호를 입력하세요" }]}
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item
+            name="confirm_password"
+            label="새 비밀번호 확인"
+            dependencies={["new_password"]}
+            rules={[
+              { required: true, message: "새 비밀번호를 다시 입력하세요" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("new_password") === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error("비밀번호가 일치하지 않습니다"));
+                },
+              }),
+            ]}
+          >
+            <Input.Password />
           </Form.Item>
         </Form>
       </Modal>
