@@ -43,7 +43,9 @@ def test_calculate_bulk_endpoint(client):
     )
 
     assert response.status_code == 200
-    records = response.json()
+    body = response.json()
+    assert body["errors"] == []
+    records = body["created"]
     assert len(records) == 2
     assert records[0]["employee_name"] == "홍길동"
     assert records[0]["net_pay"] == 2_613_378
@@ -63,9 +65,48 @@ def test_calculate_bulk_endpoint_defaults_missing_columns(client):
     )
 
     assert response.status_code == 200
-    record = response.json()[0]
+    record = response.json()["created"][0]
     assert record["employee_name"] == ""
     assert record["num_dependents"] == 1
+
+
+def test_calculate_bulk_endpoint_missing_gross_pay_column(client):
+    csv_content = "employee_name\n홍길동\n".encode("utf-8")
+
+    response = client.post(
+        "/calculate/bulk",
+        files={"file": ("salaries.csv", csv_content, "text/csv")},
+    )
+
+    assert response.status_code == 400
+
+
+def test_calculate_bulk_endpoint_skips_invalid_rows_and_reports_them(client):
+    csv_content = (
+        "employee_name,gross_pay\n"
+        "홍길동,3000000\n"
+        "김철수,not-a-number\n"
+        "박영희,\n"
+        "이민수,-1000\n"
+    ).encode("utf-8")
+
+    response = client.post(
+        "/calculate/bulk",
+        files={"file": ("salaries.csv", csv_content, "text/csv")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert len(body["created"]) == 1
+    assert body["created"][0]["employee_name"] == "홍길동"
+
+    assert len(body["errors"]) == 3
+    assert [e["row"] for e in body["errors"]] == [3, 4, 5]
+    assert all("gross_pay" in e["reason"] for e in body["errors"])
+
+    saved = client.get("/records").json()
+    assert len(saved) == 1
 
 
 def test_update_record_recalculates_values(client):

@@ -177,15 +177,41 @@ async def calculate_bulk(
     current_user: User = Depends(get_current_user),
 ):
     content = await file.read()
-    df = pd.read_csv(io.BytesIO(content))
+    try:
+        df = pd.read_csv(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="CSV 파일을 읽을 수 없습니다.")
 
-    if "num_dependents" not in df.columns:
-        df["num_dependents"] = 1
+    if "gross_pay" not in df.columns:
+        raise HTTPException(status_code=400, detail="CSV에 gross_pay 컬럼이 없습니다.")
+
     if "employee_name" not in df.columns:
         df["employee_name"] = ""
+    if "num_dependents" not in df.columns:
+        df["num_dependents"] = 1
 
-    records = _save_calculated(df, db, current_user.id)
-    return [_serialize(record) for record in records]
+    # gross_pay는 필수: 비어있거나 숫자가 아니거나 음수인 행은 저장하지 않고 오류로 보고한다.
+    # num_dependents는 선택 항목이라, 비어있거나 숫자가 아니면 기본값 1로 보정한다.
+    df["gross_pay"] = pd.to_numeric(df["gross_pay"], errors="coerce")
+    df["num_dependents"] = pd.to_numeric(df["num_dependents"], errors="coerce").fillna(1).clip(lower=1)
+
+    valid_mask = df["gross_pay"].notna() & (df["gross_pay"] >= 0)
+    errors = [
+        {"row": int(idx) + 2, "reason": "세전 급여(gross_pay) 값이 없거나 올바른 숫자가 아닙니다"}
+        for idx in df.index[~valid_mask]
+    ]
+
+    valid_df = df[valid_mask].copy()
+    # to_numeric/clip을 거치며 float64가 된 컬럼을 정수로 되돌린다.
+    # (income_tax_table과의 merge_asof는 dtype이 일치해야 하므로 float로 두면 실패한다)
+    valid_df["gross_pay"] = valid_df["gross_pay"].astype(int)
+    valid_df["num_dependents"] = valid_df["num_dependents"].astype(int)
+    records = _save_calculated(valid_df, db, current_user.id) if not valid_df.empty else []
+
+    return {
+        "created": [_serialize(record) for record in records],
+        "errors": errors,
+    }
 
 
 @app.get("/records")

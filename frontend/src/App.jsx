@@ -107,7 +107,7 @@ function buildColumns({ onEdit, onDelete }) {
 }
 
 function AppContent({ onLogout }) {
-  const { message } = AntApp.useApp();
+  const { message, modal } = AntApp.useApp();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
@@ -178,10 +178,36 @@ function AppContent({ onLogout }) {
 
     try {
       const response = await api.post("/calculate/bulk", formData);
+      const { created, errors } = response.data;
       await refreshAll();
-      message.success(`${response.data.length}건이 일괄 계산되었습니다.`);
+
+      if (errors.length === 0) {
+        message.success(`${created.length}건이 일괄 계산되었습니다.`);
+      } else {
+        if (created.length > 0) {
+          message.warning(`${created.length}건 성공, ${errors.length}건 실패했습니다.`);
+        } else {
+          message.error("업로드에 실패했습니다. 아래 오류를 확인해주세요.");
+        }
+        modal.warning({
+          title: "건너뛴 행이 있습니다",
+          content: (
+            <ul>
+              {errors.map((e) => (
+                <li key={e.row}>
+                  {e.row}행: {e.reason}
+                </li>
+              ))}
+            </ul>
+          ),
+        });
+      }
     } catch (err) {
-      reportError(err, "CSV 일괄 업로드에 실패했습니다.");
+      if (err.response?.status === 400) {
+        message.error(err.response.data?.detail || "CSV 파일을 확인해주세요.");
+      } else {
+        reportError(err, "CSV 일괄 업로드에 실패했습니다.");
+      }
     } finally {
       setUploading(false);
     }
