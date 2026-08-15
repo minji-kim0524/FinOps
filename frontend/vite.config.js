@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.js',
+    globals: true,
+  },
   build: {
     // antd 하나만으로도 tree-shaking 후 ~1MB라, 이 값은 "실수로 전부 한 덩어리가 됐는지"를
     // 감지하기 위한 임계값입니다. vendor-antd 청크의 정상 크기를 반영해 올려둠.
