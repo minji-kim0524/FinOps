@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
 import {
   App as AntApp,
   Button,
   ConfigProvider,
+  DatePicker,
   Form,
   Input,
   InputNumber,
@@ -54,6 +56,14 @@ const SUMMARY_COLUMNS = [
 
 function buildColumns({ onEdit, onDelete }) {
   return [
+    {
+      title: "계산일시",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 150,
+      sorter: (a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf(),
+      render: (value) => dayjs(value).format("YYYY-MM-DD HH:mm"),
+    },
     {
       title: "직원명",
       dataIndex: "employee_name",
@@ -114,6 +124,9 @@ function AppContent({ onLogout }) {
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [dateRange, setDateRange] = useState(null);
+  const [minGrossPay, setMinGrossPay] = useState(null);
+  const [maxGrossPay, setMaxGrossPay] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
@@ -292,13 +305,32 @@ function AppContent({ onLogout }) {
     []
   );
 
-  const filteredRecords = useMemo(
-    () =>
-      records.filter((record) =>
-        (record.employee_name || "").toLowerCase().includes(searchText.toLowerCase())
-      ),
-    [records, searchText]
-  );
+  const resetFilters = () => {
+    setSearchText("");
+    setDateRange(null);
+    setMinGrossPay(null);
+    setMaxGrossPay(null);
+  };
+
+  const filteredRecords = useMemo(() => {
+    const rangeStart = dateRange?.[0]?.startOf("day").valueOf();
+    const rangeEnd = dateRange?.[1]?.endOf("day").valueOf();
+
+    return records.filter((record) => {
+      const matchesName = (record.employee_name || "")
+        .toLowerCase()
+        .includes(searchText.toLowerCase());
+
+      const createdAt = dayjs(record.created_at).valueOf();
+      const matchesDate =
+        (!rangeStart || createdAt >= rangeStart) && (!rangeEnd || createdAt <= rangeEnd);
+
+      const matchesMin = minGrossPay == null || record.gross_pay >= minGrossPay;
+      const matchesMax = maxGrossPay == null || record.gross_pay <= maxGrossPay;
+
+      return matchesName && matchesDate && matchesMin && matchesMax;
+    });
+  }, [records, searchText, dateRange, minGrossPay, maxGrossPay]);
 
   return (
     <div className="app">
@@ -343,12 +375,35 @@ function AppContent({ onLogout }) {
         </Button>
       </div>
 
-      <Input.Search
-        placeholder="직원명으로 검색"
-        allowClear
-        onChange={(e) => setSearchText(e.target.value)}
-        style={{ maxWidth: 300, marginBottom: 16 }}
-      />
+      <Space wrap style={{ marginBottom: 16 }}>
+        <Input.Search
+          placeholder="직원명으로 검색"
+          allowClear
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{ width: 220 }}
+        />
+        <DatePicker.RangePicker
+          placeholder={["계산일 시작", "계산일 끝"]}
+          value={dateRange}
+          onChange={(value) => setDateRange(value)}
+        />
+        <InputNumber
+          placeholder="최소 급여"
+          min={0}
+          value={minGrossPay}
+          onChange={setMinGrossPay}
+          style={{ width: 140 }}
+        />
+        <InputNumber
+          placeholder="최대 급여"
+          min={0}
+          value={maxGrossPay}
+          onChange={setMaxGrossPay}
+          style={{ width: 140 }}
+        />
+        <Button onClick={resetFilters}>필터 초기화</Button>
+      </Space>
 
       <Table
         dataSource={filteredRecords}

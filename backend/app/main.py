@@ -71,6 +71,7 @@ EXPORT_COLUMN_LABELS = {
 def _serialize(record: SalaryRecord) -> dict:
     return {
         "id": record.id,
+        "created_at": record.created_at.isoformat(),
         "employee_name": record.employee_name,
         "gross_pay": record.gross_pay,
         "num_dependents": record.num_dependents,

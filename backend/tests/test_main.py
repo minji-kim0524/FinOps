@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 def test_calculate_endpoint(client):
     response = client.post("/calculate", json={"gross_pay": 3_000_000, "num_dependents": 1})
 
@@ -8,6 +11,7 @@ def test_calculate_endpoint(client):
     assert body["local_income_tax"] == 9_500
     assert body["net_pay"] == 2_613_378
     assert "id" in body
+    assert datetime.fromisoformat(body["created_at"])
 
 
 def test_calculate_endpoint_defaults_to_one_dependent(client):
