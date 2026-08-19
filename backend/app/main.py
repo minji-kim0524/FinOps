@@ -1,11 +1,12 @@
 import io
 import os
+import re
 
 import pandas as pd
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
@@ -38,14 +39,44 @@ class SalaryInput(BaseModel):
     employee_name: str = ""
 
 
+PASSWORD_MIN_LENGTH = 8
+
+
+def _validate_password_strength(password: str) -> str:
+    if len(password) < PASSWORD_MIN_LENGTH:
+        raise ValueError(f"비밀번호는 최소 {PASSWORD_MIN_LENGTH}자 이상이어야 합니다")
+    if not re.search(r"[A-Za-z]", password):
+        raise ValueError("비밀번호에 영문자를 포함해야 합니다")
+    if not re.search(r"\d", password):
+        raise ValueError("비밀번호에 숫자를 포함해야 합니다")
+    return password
+
+
 class AuthInput(BaseModel):
+    """로그인 전용. 이미 저장된 비밀번호를 그대로 검증해야 하므로 강도 검사를 하지 않는다."""
+
     username: str
     password: str
+
+
+class RegisterInput(BaseModel):
+    username: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def _check_password_strength(cls, value: str) -> str:
+        return _validate_password_strength(value)
 
 
 class ChangePasswordInput(BaseModel):
     current_password: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _check_password_strength(cls, value: str) -> str:
+        return _validate_password_strength(value)
 
 
 class TokenOutput(BaseModel):
@@ -127,7 +158,7 @@ def _get_record_or_404(record_id: int, owner_id: int, db: Session) -> SalaryReco
 
 
 @app.post("/auth/register", response_model=TokenOutput)
-def register(input: AuthInput, db: Session = Depends(get_db)):
+def register(input: RegisterInput, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == input.username).first() is not None:
         raise HTTPException(status_code=400, detail="Username already exists")
 

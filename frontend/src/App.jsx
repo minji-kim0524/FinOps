@@ -45,6 +45,13 @@ const numericColumn = (title, dataIndex, width = 120) => ({
   render: formatWon,
 });
 
+const NEW_PASSWORD_RULES = [
+  { required: true, message: "새 비밀번호를 입력하세요" },
+  { min: 8, message: "비밀번호는 최소 8자 이상이어야 합니다" },
+  { pattern: /[A-Za-z]/, message: "비밀번호에 영문자를 포함해야 합니다" },
+  { pattern: /\d/, message: "비밀번호에 숫자를 포함해야 합니다" },
+];
+
 const SUMMARY_COLUMNS = [
   { title: "월", dataIndex: "month", key: "month" },
   { title: "계산 건수", dataIndex: "count", key: "count", align: "right", render: (v) => v + "건" },
@@ -487,7 +494,8 @@ function AppContent({ onLogout }) {
           <Form.Item
             name="new_password"
             label="새 비밀번호"
-            rules={[{ required: true, message: "새 비밀번호를 입력하세요" }]}
+            extra="최소 8자, 영문자와 숫자를 포함해야 합니다"
+            rules={NEW_PASSWORD_RULES}
           >
             <Input.Password />
           </Form.Item>

@@ -12,9 +12,31 @@ def test_register_new_user(client):
 
 
 def test_register_duplicate_username(client):
-    response = client.post("/auth/register", json={"username": TEST_USERNAME, "password": "whatever"})
+    response = client.post(
+        "/auth/register", json={"username": TEST_USERNAME, "password": "whatever123"}
+    )
 
     assert response.status_code == 400
+
+
+def test_register_password_too_short(client):
+    response = client.post("/auth/register", json={"username": "shortpw", "password": "ab1"})
+
+    assert response.status_code == 422
+
+
+def test_register_password_without_digit(client):
+    response = client.post(
+        "/auth/register", json={"username": "nodigitpw", "password": "onlyletters"}
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_password_without_letter(client):
+    response = client.post("/auth/register", json={"username": "noletterpw", "password": "12345678"})
+
+    assert response.status_code == 422
 
 
 def test_login_success(client):

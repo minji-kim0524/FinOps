@@ -2,6 +2,15 @@ import { useState } from "react";
 import { App as AntApp, Button, Card, Form, Input, Segmented } from "antd";
 import api from "./api";
 
+const REGISTER_PASSWORD_RULES = [
+  { required: true, message: "비밀번호를 입력하세요" },
+  { min: 8, message: "비밀번호는 최소 8자 이상이어야 합니다" },
+  { pattern: /[A-Za-z]/, message: "비밀번호에 영문자를 포함해야 합니다" },
+  { pattern: /\d/, message: "비밀번호에 숫자를 포함해야 합니다" },
+];
+
+const LOGIN_PASSWORD_RULES = [{ required: true, message: "비밀번호를 입력하세요" }];
+
 function LoginPage({ onLogin }) {
   const { message } = AntApp.useApp();
   const [mode, setMode] = useState("login");
@@ -47,9 +56,10 @@ function LoginPage({ onLogin }) {
           <Form.Item
             name="password"
             label="비밀번호"
-            rules={[{ required: true, message: "비밀번호를 입력하세요" }]}
+            extra={mode === "register" ? "최소 8자, 영문자와 숫자를 포함해야 합니다" : undefined}
+            rules={mode === "register" ? REGISTER_PASSWORD_RULES : LOGIN_PASSWORD_RULES}
           >
-            <Input.Password autoComplete="current-password" />
+            <Input.Password autoComplete={mode === "register" ? "new-password" : "current-password"} />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" block loading={submitting}>
