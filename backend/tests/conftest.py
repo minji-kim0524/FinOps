@@ -6,6 +6,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
+from app.rate_limit import limiter
 
 engine = create_engine(
     "sqlite:///:memory:",
@@ -20,6 +21,8 @@ TEST_PASSWORD = "testpass123"
 
 @pytest.fixture()
 def client():
+    # 로그인/회원가입에 걸린 rate limit이 테스트 간에 누적되지 않도록 매 테스트마다 초기화한다.
+    limiter.reset()
     Base.metadata.create_all(bind=engine)
 
     def override_get_db():

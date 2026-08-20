@@ -3,16 +3,18 @@ import os
 import re
 
 import pandas as pd
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.calculator import calculate_net_pay
 from app.database import Base, engine, get_db
 from app.models import SalaryRecord, User
+from app.rate_limit import limiter
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,6 +28,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "너무 많은 요청입니다. 잠시 후 다시 시도해주세요."},
+    )
 
 
 @app.get("/health")
@@ -158,7 +170,8 @@ def _get_record_or_404(record_id: int, owner_id: int, db: Session) -> SalaryReco
 
 
 @app.post("/auth/register", response_model=TokenOutput)
-def register(input: RegisterInput, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, input: RegisterInput, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == input.username).first() is not None:
         raise HTTPException(status_code=400, detail="Username already exists")
 
@@ -170,7 +183,8 @@ def register(input: RegisterInput, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/login", response_model=TokenOutput)
-def login(input: AuthInput, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, input: AuthInput, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == input.username).first()
     if user is None or not verify_password(input.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid username or password")

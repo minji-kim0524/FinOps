@@ -24,9 +24,13 @@ function LoginPage({ onLogin }) {
       onLogin(response.data.access_token);
       message.success(mode === "login" ? "로그인되었습니다." : "회원가입 후 로그인되었습니다.");
     } catch (err) {
-      message.error(
-        mode === "login" ? "아이디 또는 비밀번호가 올바르지 않습니다." : "회원가입에 실패했습니다."
-      );
+      if (err.response?.status === 429) {
+        message.error("너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.");
+      } else {
+        message.error(
+          mode === "login" ? "아이디 또는 비밀번호가 올바르지 않습니다." : "회원가입에 실패했습니다."
+        );
+      }
     } finally {
       setSubmitting(false);
     }
