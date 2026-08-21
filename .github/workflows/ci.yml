@@ -19,6 +19,11 @@ jobs:
           python-version: "3.11"
       - run: pip install -r requirements.txt
       - run: python -m pytest -v
+      # 취약점이 있어도 빌드를 막지 않는다. requirements.txt에 버전을 고정하지 않아 항상
+      # 최신 버전을 설치하는데, 그 최신 버전에도 아직 패치가 안 나온 CVE가 있을 수 있어서
+      # (상류 라이브러리의 릴리스를 기다려야 하는 경우) 매번 CI를 빨갛게 만들면 안 되기 때문.
+      # 로그에 남겨서 새 패치가 나왔는지 주기적으로 확인하는 용도.
+      - run: pip install -q pip-audit && pip-audit -r requirements.txt || true
 
   frontend-build:
     runs-on: ubuntu-latest
