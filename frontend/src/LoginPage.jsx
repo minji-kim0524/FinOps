@@ -49,7 +49,7 @@ function LoginPage({ onLogin }) {
           onChange={setMode}
           style={{ marginBottom: 16 }}
         />
-        <Form layout="vertical" onFinish={handleFinish}>
+        <Form name="auth-form" layout="vertical" onFinish={handleFinish}>
           <Form.Item
             name="username"
             label="아이디"

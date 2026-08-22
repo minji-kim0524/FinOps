@@ -5,3 +5,5 @@ __pycache__/
 .env
 node_modules/
 *.db
+test-results/
+playwright-report/

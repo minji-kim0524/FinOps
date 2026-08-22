@@ -349,7 +349,13 @@ function AppContent({ onLogout }) {
         </Space>
       </div>
 
-      <Form form={form} layout="inline" onFinish={handleSubmit} initialValues={{ num_dependents: 1 }}>
+      <Form
+        name="calculate-form"
+        form={form}
+        layout="inline"
+        onFinish={handleSubmit}
+        initialValues={{ num_dependents: 1 }}
+      >
         <Form.Item name="employee_name">
           <Input placeholder="직원명" />
         </Form.Item>
@@ -450,7 +456,7 @@ function AppContent({ onLogout }) {
         okText="저장"
         cancelText="취소"
       >
-        <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
+        <Form name="edit-form" form={editForm} layout="vertical" onFinish={handleEditSubmit}>
           <Form.Item name="employee_name" label="직원명">
             <Input />
           </Form.Item>
@@ -483,7 +489,12 @@ function AppContent({ onLogout }) {
         cancelText="취소"
         confirmLoading={changingPassword}
       >
-        <Form form={passwordForm} layout="vertical" onFinish={handleChangePassword}>
+        <Form
+          name="password-form"
+          form={passwordForm}
+          layout="vertical"
+          onFinish={handleChangePassword}
+        >
           <Form.Item
             name="current_password"
             label="현재 비밀번호"
