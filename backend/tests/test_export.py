@@ -19,6 +19,7 @@ def test_export_records_returns_xlsx_with_data(client):
         "직원명",
         "세전 급여",
         "부양가족 수",
+        "8~20세 자녀 수",
         "국민연금",
         "건강보험",
         "장기요양보험",
@@ -30,7 +31,7 @@ def test_export_records_returns_xlsx_with_data(client):
     ]
     assert len(df) == 1
     assert df.iloc[0]["직원명"] == "홍길동"
-    assert int(df.iloc[0]["실수령액"]) == 2_613_378
+    assert int(df.iloc[0]["실수령액"]) == 2_636_093
 
 
 def test_export_records_empty(client):

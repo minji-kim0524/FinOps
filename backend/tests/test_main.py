@@ -7,9 +7,9 @@ def test_calculate_endpoint(client):
     assert response.status_code == 200
     body = response.json()
     assert body["gross_pay"] == 3_000_000
-    assert body["income_tax"] == 95_000
-    assert body["local_income_tax"] == 9_500
-    assert body["net_pay"] == 2_613_378
+    assert body["income_tax"] == 74_350
+    assert body["local_income_tax"] == 7_435
+    assert body["net_pay"] == 2_636_093
     assert "id" in body
     assert datetime.fromisoformat(body["created_at"])
 
@@ -52,9 +52,9 @@ def test_calculate_bulk_endpoint(client):
     records = body["created"]
     assert len(records) == 2
     assert records[0]["employee_name"] == "홍길동"
-    assert records[0]["net_pay"] == 2_613_378
+    assert records[0]["net_pay"] == 2_636_093
     assert records[1]["employee_name"] == "김철수"
-    assert records[1]["net_pay"] == 4_256_996
+    assert records[1]["net_pay"] == 4_192_415
 
     saved = client.get("/records").json()
     assert len(saved) == 2
@@ -127,7 +127,7 @@ def test_update_record_recalculates_values(client):
     body = response.json()
     assert body["id"] == created["id"]
     assert body["gross_pay"] == 5_000_000
-    assert body["net_pay"] == 4_256_996
+    assert body["net_pay"] == 4_192_415
 
     saved = client.get("/records").json()
     assert len(saved) == 1

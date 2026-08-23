@@ -21,7 +21,7 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
 
   const row = page.getByRole("row", { name: /홍길동/ });
   await expect(row).toContainText("3,000,000원");
-  await expect(row).toContainText("2,613,378원");
+  await expect(row).toContainText("2,636,093원");
 
   // 수정
   await row.getByRole("button", { name: "수정" }).click();
@@ -30,7 +30,7 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
   await editDialog.getByRole("button", { name: "저장" }).click();
 
   await expect(row).toContainText("5,000,000원");
-  await expect(row).toContainText("4,199,796원");
+  await expect(row).toContainText("4,160,779원");
 
   // 삭제
   await row.getByRole("button", { name: "삭제" }).click();

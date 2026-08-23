@@ -22,6 +22,7 @@ class SalaryRecord(Base):
     employee_name = Column(String, nullable=False, default="")
     gross_pay = Column(Integer, nullable=False)
     num_dependents = Column(Integer, nullable=False)
+    num_children_8_to_20 = Column(Integer, nullable=False, default=0)
     national_pension = Column(Integer, nullable=False)
     health_insurance = Column(Integer, nullable=False)
     long_term_care = Column(Integer, nullable=False)

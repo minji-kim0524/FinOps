@@ -89,6 +89,15 @@ function buildColumns({ onEdit, onDelete }) {
       sorter: (a, b) => a.num_dependents - b.num_dependents,
       render: (value) => value + "명",
     },
+    {
+      title: "8~20세 자녀 수",
+      dataIndex: "num_children_8_to_20",
+      key: "num_children_8_to_20",
+      align: "right",
+      width: 130,
+      sorter: (a, b) => a.num_children_8_to_20 - b.num_children_8_to_20,
+      render: (value) => value + "명",
+    },
     numericColumn("국민연금", "national_pension"),
     numericColumn("건강보험", "health_insurance"),
     numericColumn("장기요양보험", "long_term_care", 130),
@@ -181,9 +190,10 @@ function AppContent({ onLogout }) {
         employee_name: values.employee_name || "",
         gross_pay: values.gross_pay,
         num_dependents: values.num_dependents,
+        num_children_8_to_20: values.num_children_8_to_20 || 0,
       });
       form.resetFields();
-      form.setFieldsValue({ num_dependents: 1 });
+      form.setFieldsValue({ num_dependents: 1, num_children_8_to_20: 0 });
       await refreshAll();
       message.success("계산이 완료되었습니다.");
     } catch (err) {
@@ -258,6 +268,7 @@ function AppContent({ onLogout }) {
       employee_name: record.employee_name,
       gross_pay: record.gross_pay,
       num_dependents: record.num_dependents,
+      num_children_8_to_20: record.num_children_8_to_20,
     });
   };
 
@@ -267,6 +278,7 @@ function AppContent({ onLogout }) {
         employee_name: values.employee_name || "",
         gross_pay: values.gross_pay,
         num_dependents: values.num_dependents,
+        num_children_8_to_20: values.num_children_8_to_20 || 0,
       });
       setEditingRecord(null);
       await refreshAll();
@@ -354,7 +366,7 @@ function AppContent({ onLogout }) {
         form={form}
         layout="inline"
         onFinish={handleSubmit}
-        initialValues={{ num_dependents: 1 }}
+        initialValues={{ num_dependents: 1, num_children_8_to_20: 0 }}
       >
         <Form.Item name="employee_name">
           <Input placeholder="직원명" />
@@ -364,6 +376,9 @@ function AppContent({ onLogout }) {
         </Form.Item>
         <Form.Item name="num_dependents" rules={[{ required: true, message: "부양가족 수를 입력하세요" }]}>
           <InputNumber placeholder="부양가족 수" min={1} style={{ width: 120 }} />
+        </Form.Item>
+        <Form.Item name="num_children_8_to_20">
+          <InputNumber placeholder="8~20세 자녀 수" min={0} style={{ width: 140 }} />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit">
@@ -380,7 +395,7 @@ function AppContent({ onLogout }) {
           disabled={uploading}
         >
           <Button icon={<UploadOutlined />} loading={uploading}>
-            CSV 일괄 업로드 (employee_name, gross_pay, num_dependents 컬럼)
+            CSV 일괄 업로드 (employee_name, gross_pay, num_dependents, num_children_8_to_20 컬럼)
           </Button>
         </Upload>
         <Button icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>
@@ -473,6 +488,9 @@ function AppContent({ onLogout }) {
             rules={[{ required: true, message: "부양가족 수를 입력하세요" }]}
           >
             <InputNumber style={{ width: "100%" }} min={1} />
+          </Form.Item>
+          <Form.Item name="num_children_8_to_20" label="8~20세 자녀 수">
+            <InputNumber style={{ width: "100%" }} min={0} />
           </Form.Item>
         </Form>
       </Modal>

@@ -48,6 +48,7 @@ def health_check():
 class SalaryInput(BaseModel):
     gross_pay: int
     num_dependents: int = 1
+    num_children_8_to_20: int = 0
     employee_name: str = ""
 
 
@@ -100,6 +101,7 @@ EXPORT_COLUMN_LABELS = {
     "employee_name": "직원명",
     "gross_pay": "세전 급여",
     "num_dependents": "부양가족 수",
+    "num_children_8_to_20": "8~20세 자녀 수",
     "national_pension": "국민연금",
     "health_insurance": "건강보험",
     "long_term_care": "장기요양보험",
@@ -118,6 +120,7 @@ def _serialize(record: SalaryRecord) -> dict:
         "employee_name": record.employee_name,
         "gross_pay": record.gross_pay,
         "num_dependents": record.num_dependents,
+        "num_children_8_to_20": record.num_children_8_to_20,
         "national_pension": record.national_pension,
         "health_insurance": record.health_insurance,
         "long_term_care": record.long_term_care,
@@ -133,6 +136,7 @@ def _apply_calculated_fields(record: SalaryRecord, row: dict) -> None:
     record.employee_name = str(row.get("employee_name", ""))
     record.gross_pay = int(row["gross_pay"])
     record.num_dependents = int(row["num_dependents"])
+    record.num_children_8_to_20 = int(row.get("num_children_8_to_20", 0))
     record.national_pension = int(row["national_pension"])
     record.health_insurance = int(row["health_insurance"])
     record.long_term_care = int(row["long_term_care"])
@@ -235,11 +239,16 @@ async def calculate_bulk(
         df["employee_name"] = ""
     if "num_dependents" not in df.columns:
         df["num_dependents"] = 1
+    if "num_children_8_to_20" not in df.columns:
+        df["num_children_8_to_20"] = 0
 
     # gross_pay는 필수: 비어있거나 숫자가 아니거나 음수인 행은 저장하지 않고 오류로 보고한다.
-    # num_dependents는 선택 항목이라, 비어있거나 숫자가 아니면 기본값 1로 보정한다.
+    # num_dependents/num_children_8_to_20은 선택 항목이라, 비어있거나 숫자가 아니면 기본값으로 보정한다.
     df["gross_pay"] = pd.to_numeric(df["gross_pay"], errors="coerce")
     df["num_dependents"] = pd.to_numeric(df["num_dependents"], errors="coerce").fillna(1).clip(lower=1)
+    df["num_children_8_to_20"] = (
+        pd.to_numeric(df["num_children_8_to_20"], errors="coerce").fillna(0).clip(lower=0)
+    )
 
     valid_mask = df["gross_pay"].notna() & (df["gross_pay"] >= 0)
     errors = [
@@ -252,6 +261,7 @@ async def calculate_bulk(
     # (income_tax_table과의 merge_asof는 dtype이 일치해야 하므로 float로 두면 실패한다)
     valid_df["gross_pay"] = valid_df["gross_pay"].astype(int)
     valid_df["num_dependents"] = valid_df["num_dependents"].astype(int)
+    valid_df["num_children_8_to_20"] = valid_df["num_children_8_to_20"].astype(int)
     records = _save_calculated(valid_df, db, current_user.id) if not valid_df.empty else []
 
     return {

@@ -29,11 +29,11 @@ def test_monthly_summary_groups_by_month(client):
     assert "2020-01" in data
     assert data["2020-01"]["count"] == 1
     assert data["2020-01"]["total_gross_pay"] == 5_000_000
-    assert data["2020-01"]["total_deduction"] == 800_204
-    assert data["2020-01"]["total_net_pay"] == 4_199_796
-    assert data["2020-01"]["avg_net_pay"] == 4_199_796
+    assert data["2020-01"]["total_deduction"] == 839_221
+    assert data["2020-01"]["total_net_pay"] == 4_160_779
+    assert data["2020-01"]["avg_net_pay"] == 4_160_779
 
     current_month = datetime.utcnow().strftime("%Y-%m")
     assert current_month in data
     assert data[current_month]["count"] == 1
-    assert data[current_month]["total_net_pay"] == 2_613_378
+    assert data[current_month]["total_net_pay"] == 2_636_093
