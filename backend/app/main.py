@@ -21,6 +21,7 @@ from app.auth import (
 from app.calculator import calculate_net_pay
 from app.database import Base, engine, get_db
 from app.models import SalaryRecord, User
+from app.payslip import build_payslip_pdf
 from app.rate_limit import limiter
 
 Base.metadata.create_all(bind=engine)
@@ -409,6 +410,20 @@ def monthly_summary(db: Session = Depends(get_db), current_user: User = Depends(
     summary["avg_net_pay"] = summary["avg_net_pay"].round().astype(int)
 
     return summary.to_dict("records")
+
+
+@app.get("/records/{record_id}/payslip")
+def download_payslip(
+    record_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    record = _get_record_or_404(record_id, current_user.id, db)
+    pdf_bytes = build_payslip_pdf(record)
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=payslip_{record_id}.pdf"},
+    )
 
 
 @app.put("/records/{record_id}")

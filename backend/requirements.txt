@@ -7,6 +7,7 @@ python-multipart
 bcrypt
 pyjwt
 openpyxl
+reportlab
 slowapi
 pytest
 httpx

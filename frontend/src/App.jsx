@@ -61,7 +61,7 @@ const SUMMARY_COLUMNS = [
   { title: "평균 실수령액", dataIndex: "avg_net_pay", key: "avg_net_pay", align: "right", render: formatWon },
 ];
 
-function buildColumns({ onEdit, onDelete }) {
+function buildColumns({ onEdit, onDelete, onDownloadPayslip }) {
   return [
     {
       title: "계산일시",
@@ -110,9 +110,12 @@ function buildColumns({ onEdit, onDelete }) {
       title: "관리",
       key: "actions",
       fixed: "right",
-      width: 150,
+      width: 220,
       render: (_, record) => (
         <Space>
+          <Button size="small" onClick={() => onDownloadPayslip(record.id)}>
+            명세서
+          </Button>
           <Button size="small" onClick={() => onEdit(record)}>
             수정
           </Button>
@@ -262,6 +265,22 @@ function AppContent({ onLogout }) {
     }
   };
 
+  const handleDownloadPayslip = async (id) => {
+    try {
+      const response = await api.get(`/records/${id}/payslip`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `payslip_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      reportError(err, "급여명세서 다운로드에 실패했습니다.");
+    }
+  };
+
   const openEditModal = (record) => {
     setEditingRecord(record);
     editForm.setFieldsValue({
@@ -320,7 +339,12 @@ function AppContent({ onLogout }) {
   };
 
   const columns = useMemo(
-    () => buildColumns({ onEdit: openEditModal, onDelete: handleDelete }),
+    () =>
+      buildColumns({
+        onEdit: openEditModal,
+        onDelete: handleDelete,
+        onDownloadPayslip: handleDownloadPayslip,
+      }),
     []
   );
 

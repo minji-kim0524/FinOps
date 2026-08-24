@@ -26,6 +26,12 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
   await expect(row).toContainText("3,000,000원");
   await expect(row).toContainText("2,636,093원");
 
+  // 급여명세서 PDF 다운로드
+  const downloadPromise = page.waitForEvent("download");
+  await row.getByRole("button", { name: "명세서" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^payslip_\d+\.pdf$/);
+
   // 수정
   await row.getByRole("button", { name: "수정" }).click();
   const editDialog = page.getByRole("dialog", { name: "계산 이력 수정" });
