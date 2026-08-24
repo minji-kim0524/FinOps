@@ -11,6 +11,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
+    security_question = Column(String, nullable=False)
+    security_answer_hash = Column(String, nullable=False)
 
 
 class SalaryRecord(Base):

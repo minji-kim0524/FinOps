@@ -1,5 +1,5 @@
 from app.rate_limit import limiter
-from tests.conftest import TEST_PASSWORD, TEST_USERNAME
+from tests.conftest import TEST_PASSWORD, TEST_SECURITY_ANSWER, TEST_SECURITY_QUESTION, TEST_USERNAME
 
 
 def test_login_rate_limit_blocks_after_too_many_attempts(client):
@@ -26,12 +26,23 @@ def test_register_rate_limit_blocks_after_too_many_attempts(client):
     for i in range(5):
         response = client.post(
             "/auth/register",
-            json={"username": f"ratelimituser{i}", "password": TEST_PASSWORD},
+            json={
+                "username": f"ratelimituser{i}",
+                "password": TEST_PASSWORD,
+                "security_question": TEST_SECURITY_QUESTION,
+                "security_answer": TEST_SECURITY_ANSWER,
+            },
         )
         assert response.status_code == 200
 
     blocked = client.post(
-        "/auth/register", json={"username": "oneMoreUser", "password": TEST_PASSWORD}
+        "/auth/register",
+        json={
+            "username": "oneMoreUser",
+            "password": TEST_PASSWORD,
+            "security_question": TEST_SECURITY_QUESTION,
+            "security_answer": TEST_SECURITY_ANSWER,
+        },
     )
 
     assert blocked.status_code == 429

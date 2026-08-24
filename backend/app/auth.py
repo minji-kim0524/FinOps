@@ -26,6 +26,18 @@ def verify_password(password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed_password.encode())
 
 
+def _normalize_security_answer(answer: str) -> str:
+    return answer.strip().lower()
+
+
+def hash_security_answer(answer: str) -> str:
+    return bcrypt.hashpw(_normalize_security_answer(answer).encode(), bcrypt.gensalt()).decode()
+
+
+def verify_security_answer(answer: str, hashed_answer: str) -> bool:
+    return bcrypt.checkpw(_normalize_security_answer(answer).encode(), hashed_answer.encode())
+
+
 def create_access_token(username: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode({"sub": username, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)

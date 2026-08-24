@@ -10,7 +10,14 @@ from pydantic import BaseModel, field_validator
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.auth import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    hash_security_answer,
+    verify_password,
+    verify_security_answer,
+)
 from app.calculator import calculate_net_pay
 from app.database import Base, engine, get_db
 from app.models import SalaryRecord, User
@@ -75,15 +82,43 @@ class AuthInput(BaseModel):
 class RegisterInput(BaseModel):
     username: str
     password: str
+    security_question: str
+    security_answer: str
 
     @field_validator("password")
     @classmethod
     def _check_password_strength(cls, value: str) -> str:
         return _validate_password_strength(value)
 
+    @field_validator("security_question", "security_answer")
+    @classmethod
+    def _check_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("보안 질문과 답변을 모두 입력하세요")
+        return value
+
 
 class ChangePasswordInput(BaseModel):
     current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _check_password_strength(cls, value: str) -> str:
+        return _validate_password_strength(value)
+
+
+class SecurityQuestionInput(BaseModel):
+    username: str
+
+
+class SecurityQuestionOutput(BaseModel):
+    security_question: str
+
+
+class PasswordResetInput(BaseModel):
+    username: str
+    security_answer: str
     new_password: str
 
     @field_validator("new_password")
@@ -179,7 +214,12 @@ def register(request: Request, input: RegisterInput, db: Session = Depends(get_d
     if db.query(User).filter(User.username == input.username).first() is not None:
         raise HTTPException(status_code=400, detail="Username already exists")
 
-    user = User(username=input.username, hashed_password=hash_password(input.password))
+    user = User(
+        username=input.username,
+        hashed_password=hash_password(input.password),
+        security_question=input.security_question.strip(),
+        security_answer_hash=hash_security_answer(input.security_answer),
+    )
     db.add(user)
     db.commit()
 
@@ -194,6 +234,29 @@ def login(request: Request, input: AuthInput, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     return TokenOutput(access_token=create_access_token(user.username))
+
+
+@app.post("/auth/security-question", response_model=SecurityQuestionOutput)
+@limiter.limit("5/minute")
+def get_security_question(request: Request, input: SecurityQuestionInput, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == input.username).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return SecurityQuestionOutput(security_question=user.security_question)
+
+
+@app.post("/auth/password-reset")
+@limiter.limit("5/minute")
+def reset_password(request: Request, input: PasswordResetInput, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == input.username).first()
+    if user is None or not verify_security_answer(input.security_answer, user.security_answer_hash):
+        raise HTTPException(status_code=400, detail="아이디 또는 보안 답변이 올바르지 않습니다")
+
+    user.hashed_password = hash_password(input.new_password)
+    db.commit()
+
+    return {"status": "ok"}
 
 
 @app.put("/auth/password")

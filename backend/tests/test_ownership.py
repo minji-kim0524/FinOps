@@ -1,5 +1,13 @@
 def _login_as_new_user(client, username, password="otherpass123"):
-    client.post("/auth/register", json={"username": username, "password": password})
+    client.post(
+        "/auth/register",
+        json={
+            "username": username,
+            "password": password,
+            "security_question": "질문",
+            "security_answer": "답변",
+        },
+    )
     token = client.post("/auth/login", json={"username": username, "password": password}).json()[
         "access_token"
     ]

@@ -17,6 +17,8 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 TEST_USERNAME = "tester"
 TEST_PASSWORD = "testpass123"
+TEST_SECURITY_QUESTION = "가장 좋아하는 음식은?"
+TEST_SECURITY_ANSWER = "김치찌개"
 
 
 @pytest.fixture()
@@ -35,7 +37,15 @@ def client():
     app.dependency_overrides[get_db] = override_get_db
 
     test_client = TestClient(app)
-    test_client.post("/auth/register", json={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    test_client.post(
+        "/auth/register",
+        json={
+            "username": TEST_USERNAME,
+            "password": TEST_PASSWORD,
+            "security_question": TEST_SECURITY_QUESTION,
+            "security_answer": TEST_SECURITY_ANSWER,
+        },
+    )
     token = test_client.post(
         "/auth/login", json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
     ).json()["access_token"]
