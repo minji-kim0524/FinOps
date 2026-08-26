@@ -21,6 +21,8 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -52,14 +54,17 @@ const NEW_PASSWORD_RULES = [
   { pattern: /\d/, message: "비밀번호에 숫자를 포함해야 합니다" },
 ];
 
-const SUMMARY_COLUMNS = [
-  { title: "월", dataIndex: "month", key: "month" },
+const buildSummaryColumns = (periodTitle, periodKey) => [
+  { title: periodTitle, dataIndex: periodKey, key: periodKey },
   { title: "계산 건수", dataIndex: "count", key: "count", align: "right", render: (v) => v + "건" },
   { title: "총 세전 급여", dataIndex: "total_gross_pay", key: "total_gross_pay", align: "right", render: formatWon },
   { title: "총 공제액", dataIndex: "total_deduction", key: "total_deduction", align: "right", render: formatWon },
   { title: "총 실수령액", dataIndex: "total_net_pay", key: "total_net_pay", align: "right", render: formatWon },
   { title: "평균 실수령액", dataIndex: "avg_net_pay", key: "avg_net_pay", align: "right", render: formatWon },
 ];
+
+const MONTHLY_SUMMARY_COLUMNS = buildSummaryColumns("월", "month");
+const YEARLY_SUMMARY_COLUMNS = buildSummaryColumns("연도", "year");
 
 function buildColumns({ onEdit, onDelete, onDownloadPayslip }) {
   return [
@@ -142,6 +147,7 @@ function AppContent({ onLogout }) {
   const [passwordForm] = Form.useForm();
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState([]);
+  const [yearlySummary, setYearlySummary] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [dateRange, setDateRange] = useState(null);
   const [minGrossPay, setMinGrossPay] = useState(null);
@@ -179,8 +185,17 @@ function AppContent({ onLogout }) {
     }
   };
 
+  const fetchYearlySummary = async () => {
+    try {
+      const response = await api.get("/records/summary/yearly");
+      setYearlySummary(response.data);
+    } catch (err) {
+      reportError(err, "연도별 집계를 불러오지 못했습니다.");
+    }
+  };
+
   const refreshAll = async () => {
-    await Promise.all([fetchRecords(), fetchSummary()]);
+    await Promise.all([fetchRecords(), fetchSummary(), fetchYearlySummary()]);
   };
 
   useEffect(() => {
@@ -478,11 +493,33 @@ function AppContent({ onLogout }) {
         </BarChart>
       </ResponsiveContainer>
 
+      <h2>월별 추이</h2>
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={summary}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="month" />
+          <YAxis tickFormatter={(value) => (value / 10000).toLocaleString() + "만"} />
+          <Tooltip formatter={(value) => formatWon(value)} />
+          <Legend />
+          <Line type="monotone" dataKey="total_gross_pay" name="총 세전 급여" stroke="#8884d8" />
+          <Line type="monotone" dataKey="total_net_pay" name="총 실수령액" stroke="#82ca9d" />
+        </LineChart>
+      </ResponsiveContainer>
+
       <h2>월별 집계</h2>
       <Table
         dataSource={summary}
-        columns={SUMMARY_COLUMNS}
+        columns={MONTHLY_SUMMARY_COLUMNS}
         rowKey="month"
+        pagination={false}
+        scroll={{ x: "max-content" }}
+      />
+
+      <h2>연도별 집계</h2>
+      <Table
+        dataSource={yearlySummary}
+        columns={YEARLY_SUMMARY_COLUMNS}
+        rowKey="year"
         pagination={false}
         scroll={{ x: "max-content" }}
       />
