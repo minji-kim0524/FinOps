@@ -371,14 +371,14 @@ def export_records(db: Session = Depends(get_db), current_user: User = Depends(g
     )
 
 
-def _build_period_summary(records: list[SalaryRecord], period_key: str, date_format: str) -> list[dict]:
+def _build_summary(records: list[SalaryRecord], group_key: str, group_value) -> list[dict]:
     if not records:
         return []
 
     df = pd.DataFrame(
         [
             {
-                period_key: record.created_at.strftime(date_format),
+                group_key: group_value(record),
                 "gross_pay": record.gross_pay,
                 "total_deduction": record.total_deduction,
                 "net_pay": record.net_pay,
@@ -388,7 +388,7 @@ def _build_period_summary(records: list[SalaryRecord], period_key: str, date_for
     )
 
     summary = (
-        df.groupby(period_key)
+        df.groupby(group_key)
         .agg(
             count=("net_pay", "size"),
             total_gross_pay=("gross_pay", "sum"),
@@ -397,7 +397,7 @@ def _build_period_summary(records: list[SalaryRecord], period_key: str, date_for
             avg_net_pay=("net_pay", "mean"),
         )
         .reset_index()
-        .sort_values(period_key)
+        .sort_values(group_key)
     )
     summary["avg_net_pay"] = summary["avg_net_pay"].round().astype(int)
 
@@ -413,7 +413,7 @@ def monthly_summary(db: Session = Depends(get_db), current_user: User = Depends(
         .all()
     )
 
-    return _build_period_summary(records, period_key="month", date_format="%Y-%m")
+    return _build_summary(records, "month", lambda r: r.created_at.strftime("%Y-%m"))
 
 
 @app.get("/records/summary/yearly")
@@ -425,7 +425,19 @@ def yearly_summary(db: Session = Depends(get_db), current_user: User = Depends(g
         .all()
     )
 
-    return _build_period_summary(records, period_key="year", date_format="%Y")
+    return _build_summary(records, "year", lambda r: r.created_at.strftime("%Y"))
+
+
+@app.get("/records/summary/by-employee")
+def employee_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    records = (
+        db.query(SalaryRecord)
+        .filter(SalaryRecord.owner_id == current_user.id)
+        .order_by(SalaryRecord.created_at)
+        .all()
+    )
+
+    return _build_summary(records, "employee_name", lambda r: r.employee_name or "(미지정)")
 
 
 @app.get("/records/{record_id}/payslip")

@@ -10,6 +10,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Table,
   theme as antdTheme,
@@ -65,6 +66,7 @@ const buildSummaryColumns = (periodTitle, periodKey) => [
 
 const MONTHLY_SUMMARY_COLUMNS = buildSummaryColumns("월", "month");
 const YEARLY_SUMMARY_COLUMNS = buildSummaryColumns("연도", "year");
+const EMPLOYEE_SUMMARY_COLUMNS = buildSummaryColumns("직원명", "employee_name");
 
 function buildColumns({ onEdit, onDelete, onDownloadPayslip }) {
   return [
@@ -148,7 +150,9 @@ function AppContent({ onLogout }) {
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState([]);
   const [yearlySummary, setYearlySummary] = useState([]);
+  const [employeeSummary, setEmployeeSummary] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [dateRange, setDateRange] = useState(null);
   const [minGrossPay, setMinGrossPay] = useState(null);
   const [maxGrossPay, setMaxGrossPay] = useState(null);
@@ -194,8 +198,22 @@ function AppContent({ onLogout }) {
     }
   };
 
+  const fetchEmployeeSummary = async () => {
+    try {
+      const response = await api.get("/records/summary/by-employee");
+      setEmployeeSummary(response.data);
+    } catch (err) {
+      reportError(err, "직원별 집계를 불러오지 못했습니다.");
+    }
+  };
+
   const refreshAll = async () => {
-    await Promise.all([fetchRecords(), fetchSummary(), fetchYearlySummary()]);
+    await Promise.all([
+      fetchRecords(),
+      fetchSummary(),
+      fetchYearlySummary(),
+      fetchEmployeeSummary(),
+    ]);
   };
 
   useEffect(() => {
@@ -365,10 +383,16 @@ function AppContent({ onLogout }) {
 
   const resetFilters = () => {
     setSearchText("");
+    setSelectedEmployee(null);
     setDateRange(null);
     setMinGrossPay(null);
     setMaxGrossPay(null);
   };
+
+  const employeeOptions = useMemo(() => {
+    const names = [...new Set(records.map((r) => r.employee_name).filter(Boolean))].sort();
+    return names.map((name) => ({ label: name, value: name }));
+  }, [records]);
 
   const filteredRecords = useMemo(() => {
     const rangeStart = dateRange?.[0]?.startOf("day").valueOf();
@@ -379,6 +403,8 @@ function AppContent({ onLogout }) {
         .toLowerCase()
         .includes(searchText.toLowerCase());
 
+      const matchesEmployee = !selectedEmployee || record.employee_name === selectedEmployee;
+
       const createdAt = dayjs(record.created_at).valueOf();
       const matchesDate =
         (!rangeStart || createdAt >= rangeStart) && (!rangeEnd || createdAt <= rangeEnd);
@@ -386,9 +412,9 @@ function AppContent({ onLogout }) {
       const matchesMin = minGrossPay == null || record.gross_pay >= minGrossPay;
       const matchesMax = maxGrossPay == null || record.gross_pay <= maxGrossPay;
 
-      return matchesName && matchesDate && matchesMin && matchesMax;
+      return matchesName && matchesEmployee && matchesDate && matchesMin && matchesMax;
     });
-  }, [records, searchText, dateRange, minGrossPay, maxGrossPay]);
+  }, [records, searchText, selectedEmployee, dateRange, minGrossPay, maxGrossPay]);
 
   return (
     <div className="app">
@@ -449,6 +475,15 @@ function AppContent({ onLogout }) {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           style={{ width: 220 }}
+        />
+        <Select
+          placeholder="직원 선택"
+          allowClear
+          showSearch
+          value={selectedEmployee}
+          onChange={setSelectedEmployee}
+          options={employeeOptions}
+          style={{ width: 160 }}
         />
         <DatePicker.RangePicker
           placeholder={["계산일 시작", "계산일 끝"]}
@@ -520,6 +555,15 @@ function AppContent({ onLogout }) {
         dataSource={yearlySummary}
         columns={YEARLY_SUMMARY_COLUMNS}
         rowKey="year"
+        pagination={false}
+        scroll={{ x: "max-content" }}
+      />
+
+      <h2>직원별 집계</h2>
+      <Table
+        dataSource={employeeSummary}
+        columns={EMPLOYEE_SUMMARY_COLUMNS}
+        rowKey="employee_name"
         pagination={false}
         scroll={{ x: "max-content" }}
       />

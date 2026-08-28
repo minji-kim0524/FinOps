@@ -27,7 +27,7 @@ describe("App", () => {
     expect(api.get).not.toHaveBeenCalled();
   });
 
-  it("토큰이 있으면 메인 화면을 보여주고 이력·월별/연도별 집계를 불러온다", async () => {
+  it("토큰이 있으면 메인 화면을 보여주고 이력·월별/연도별/직원별 집계를 불러온다", async () => {
     localStorage.setItem("token", "test-token");
 
     render(<App />);
@@ -37,6 +37,7 @@ describe("App", () => {
       expect(api.get).toHaveBeenCalledWith("/records");
       expect(api.get).toHaveBeenCalledWith("/records/summary");
       expect(api.get).toHaveBeenCalledWith("/records/summary/yearly");
+      expect(api.get).toHaveBeenCalledWith("/records/summary/by-employee");
     });
   });
 

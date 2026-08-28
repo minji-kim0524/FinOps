@@ -72,3 +72,32 @@ def test_yearly_summary_groups_by_year(client):
     assert current_year in data
     assert data[current_year]["count"] == 1
     assert data[current_year]["total_net_pay"] == 2_636_093
+
+
+def test_employee_summary_empty(client):
+    response = client.get("/records/summary/by-employee")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_employee_summary_groups_by_employee_name(client):
+    client.post(
+        "/calculate", json={"employee_name": "홍길동", "gross_pay": 3_000_000, "num_dependents": 1}
+    )
+    client.post(
+        "/calculate", json={"employee_name": "홍길동", "gross_pay": 5_000_000, "num_dependents": 1}
+    )
+    client.post("/calculate", json={"gross_pay": 3_000_000, "num_dependents": 1})
+
+    response = client.get("/records/summary/by-employee")
+
+    assert response.status_code == 200
+    data = {row["employee_name"]: row for row in response.json()}
+
+    assert data["홍길동"]["count"] == 2
+    assert data["홍길동"]["total_gross_pay"] == 8_000_000
+    assert data["홍길동"]["total_net_pay"] == 2_636_093 + 4_160_779
+
+    assert data["(미지정)"]["count"] == 1
+    assert data["(미지정)"]["total_net_pay"] == 2_636_093

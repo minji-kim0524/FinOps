@@ -22,7 +22,9 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
   await page.getByPlaceholder("세전 급여").fill("3000000");
   await page.getByRole("button", { name: "계산하기" }).click();
 
-  const row = page.getByRole("row", { name: /홍길동/ });
+  // 직원별 집계 표에도 같은 이름이 나오므로, 계산 이력 표(첫 번째 표)로 범위를 좁힌다.
+  const historyTable = page.getByRole("table").first();
+  const row = historyTable.getByRole("row", { name: /홍길동/ });
   await expect(row).toContainText("3,000,000원");
   await expect(row).toContainText("2,636,093원");
 
