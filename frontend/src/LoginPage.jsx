@@ -144,9 +144,10 @@ function LoginPage({ onLogin }) {
           <Form.Item
             name="username"
             label="아이디"
+            extra={mode === "register" ? "예: minji123" : undefined}
             rules={[{ required: true, message: "아이디를 입력하세요" }]}
           >
-            <Input autoComplete="username" />
+            <Input autoComplete="username" placeholder="예: minji123" />
           </Form.Item>
           <Form.Item
             name="password"
