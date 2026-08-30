@@ -58,6 +58,33 @@ def test_calculate_net_pay_more_dependents_reduces_income_tax():
     assert result.iloc[0]["net_pay"] < result.iloc[1]["net_pay"]
 
 
+def test_calculate_net_pay_national_pension_applies_upper_cap():
+    # 월급여가 기준소득월액 상한액(6,370,000원)을 넘으면, 상한액을 기준으로 국민연금을 계산한다.
+    df = pd.DataFrame([{"gross_pay": 10_000_000, "num_dependents": 1}])
+
+    result = calculate_net_pay(df)
+
+    assert result.iloc[0]["national_pension"] == round(6_370_000 * 0.045)
+
+
+def test_calculate_net_pay_national_pension_applies_lower_floor():
+    # 월급여가 기준소득월액 하한액(400,000원)보다 낮으면, 하한액을 기준으로 국민연금을 계산한다.
+    df = pd.DataFrame([{"gross_pay": 300_000, "num_dependents": 1}])
+
+    result = calculate_net_pay(df)
+
+    assert result.iloc[0]["national_pension"] == round(400_000 * 0.045)
+
+
+def test_calculate_net_pay_national_pension_within_range_uses_gross_pay():
+    # 상/하한액 사이의 급여는 그대로 국민연금 계산 기준(기준소득월액)이 된다.
+    df = pd.DataFrame([{"gross_pay": 1_000_000, "num_dependents": 1}])
+
+    result = calculate_net_pay(df)
+
+    assert result.iloc[0]["national_pension"] == round(1_000_000 * 0.045)
+
+
 def test_calculate_net_pay_multiple_rows():
     df = pd.DataFrame(
         [

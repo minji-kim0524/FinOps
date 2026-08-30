@@ -12,6 +12,11 @@ RATES = {
     "employment_insurance": 0.009,  # 고용보험
 }
 
+# 국민연금 기준소득월액 상・하한액(2025.7.1.~2026.6.30. 적용, 보건복지부 고시).
+# 월급여가 이 범위를 벗어나면 실제 기준소득월액은 상/하한액으로 고정되어 보험료가 계산된다.
+NATIONAL_PENSION_INCOME_FLOOR = 400_000
+NATIONAL_PENSION_INCOME_CAP = 6_370_000
+
 # 지방소득세는 항상 소득세의 10%
 LOCAL_INCOME_TAX_RATE = 0.1
 
@@ -21,7 +26,10 @@ def calculate_net_pay(df: pd.DataFrame) -> pd.DataFrame:
     if "num_children_8_to_20" not in df.columns:
         df["num_children_8_to_20"] = 0
 
-    df["national_pension"] = (df["gross_pay"] * RATES["national_pension"]).round().astype(int)
+    pension_base = df["gross_pay"].clip(
+        lower=NATIONAL_PENSION_INCOME_FLOOR, upper=NATIONAL_PENSION_INCOME_CAP
+    )
+    df["national_pension"] = (pension_base * RATES["national_pension"]).round().astype(int)
     df["health_insurance"] = (df["gross_pay"] * RATES["health_insurance"]).round().astype(int)
     df["long_term_care"] = (df["health_insurance"] * RATES["long_term_care"]).round().astype(int)
     df["employment_insurance"] = (df["gross_pay"] * RATES["employment_insurance"]).round().astype(int)
