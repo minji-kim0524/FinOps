@@ -18,6 +18,36 @@ const SECURITY_QUESTIONS = [
   "첫 반려동물의 이름은 무엇인가요?",
 ];
 
+const NETWORK_ERROR_MESSAGE = "서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.";
+const RATE_LIMIT_MESSAGE = "너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.";
+
+// FastAPI의 pydantic 검증 에러(422)는 detail이 배열이며, 우리가 한글로 작성한
+// field_validator 메시지가 그 안에 "Value error, ..." 형태로 들어있다.
+export function extractValidationMessage(err) {
+  const detail = err.response?.data?.detail;
+  const firstMessage = Array.isArray(detail) ? detail[0]?.msg : undefined;
+  return firstMessage ? firstMessage.replace(/^Value error,\s*/, "") : undefined;
+}
+
+// 로그인/회원가입 실패 사유를 사용자에게 보여줄 한글 메시지로 변환한다.
+// 백엔드가 아예 응답하지 못한 경우(네트워크 오류/서버 다운)를 "아이디 또는 비밀번호가 틀렸다"는
+// 메시지로 오인하지 않도록 가장 먼저 분기한다.
+export function describeAuthError(err, mode) {
+  if (!err.response) {
+    return NETWORK_ERROR_MESSAGE;
+  }
+  if (err.response.status === 429) {
+    return RATE_LIMIT_MESSAGE;
+  }
+  if (mode === "register" && err.response.status === 400) {
+    return "이미 사용 중인 아이디입니다.";
+  }
+  if (mode === "register") {
+    return extractValidationMessage(err) || "회원가입에 실패했습니다.";
+  }
+  return "아이디 또는 비밀번호가 올바르지 않습니다.";
+}
+
 function LoginPage({ onLogin }) {
   const { message } = AntApp.useApp();
   const [mode, setMode] = useState("login");
@@ -39,13 +69,7 @@ function LoginPage({ onLogin }) {
       onLogin(response.data.access_token);
       message.success(mode === "login" ? "로그인되었습니다." : "회원가입 후 로그인되었습니다.");
     } catch (err) {
-      if (err.response?.status === 429) {
-        message.error("너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.");
-      } else {
-        message.error(
-          mode === "login" ? "아이디 또는 비밀번호가 올바르지 않습니다." : "회원가입에 실패했습니다."
-        );
-      }
+      message.error(describeAuthError(err, mode));
     } finally {
       setSubmitting(false);
     }
@@ -68,8 +92,10 @@ function LoginPage({ onLogin }) {
       setResetQuestion(response.data.security_question);
       setResetStep(2);
     } catch (err) {
-      if (err.response?.status === 429) {
-        message.error("너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.");
+      if (!err.response) {
+        message.error(NETWORK_ERROR_MESSAGE);
+      } else if (err.response.status === 429) {
+        message.error(RATE_LIMIT_MESSAGE);
       } else {
         message.error("존재하지 않는 아이디입니다.");
       }
@@ -89,10 +115,12 @@ function LoginPage({ onLogin }) {
       message.success("비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요.");
       closeResetModal();
     } catch (err) {
-      if (err.response?.status === 429) {
-        message.error("너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.");
+      if (!err.response) {
+        message.error(NETWORK_ERROR_MESSAGE);
+      } else if (err.response.status === 429) {
+        message.error(RATE_LIMIT_MESSAGE);
       } else {
-        message.error("보안 답변이 올바르지 않습니다.");
+        message.error(extractValidationMessage(err) || "보안 답변이 올바르지 않습니다.");
       }
     } finally {
       setResetLoading(false);
