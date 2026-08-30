@@ -19,12 +19,13 @@ from app.auth import (
     verify_security_answer,
 )
 from app.calculator import calculate_net_pay
-from app.database import Base, engine, get_db
+from app.database import get_db
 from app.models import SalaryRecord, User
 from app.payslip import build_payslip_pdf
 from app.rate_limit import limiter
 
-Base.metadata.create_all(bind=engine)
+# DB 스키마는 alembic 마이그레이션으로 관리한다 (schema는 더 이상 create_all로 자동 생성하지 않음).
+# 로컬/Docker/Render 모두 애플리케이션 시작 전 `alembic upgrade head`를 실행해야 한다.
 
 app = FastAPI(title="FinOps")
 

@@ -11,7 +11,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "venv/bin/uvicorn app.main:app --port 8000",
+      command: "venv/bin/alembic upgrade head && venv/bin/uvicorn app.main:app --port 8000",
       cwd: "../backend",
       url: "http://localhost:8000/health",
       reuseExistingServer: !process.env.CI,

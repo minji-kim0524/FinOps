@@ -25,6 +25,7 @@
 - Python, FastAPI
 - pandas (계산 로직, CSV 처리, 월별 집계, 엑셀 내보내기)
 - SQLAlchemy + PostgreSQL(배포)/SQLite(로컬 기본값)
+- Alembic (DB 스키마 마이그레이션)
 - JWT(pyjwt) + bcrypt 기반 인증
 - pytest (단위/통합 테스트)
 
@@ -51,6 +52,8 @@ FinOps/
 │   │   ├── models.py       # SQLAlchemy 모델 (User, SalaryRecord)
 │   │   ├── database.py     # DB 연결 설정
 │   │   └── data/           # 근로소득 간이세액표 원본 데이터 CSV
+│   ├── migrations/          # Alembic 마이그레이션 스크립트
+│   ├── alembic.ini
 │   ├── tests/               # pytest 테스트
 │   └── Dockerfile
 ├── frontend/
@@ -75,9 +78,16 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
-DB는 별도 설정이 없으면 SQLite(`finops.db`)를 사용합니다.
+DB는 별도 설정이 없으면 SQLite(`finops.db`)를 사용합니다. 테이블은 더 이상 앱 실행 시 자동 생성되지 않으므로, 최초 실행 전(그리고 이후 스키마가 바뀔 때마다) `alembic upgrade head`를 실행해야 합니다.
+
+모델(`app/models.py`)을 수정했다면 새 마이그레이션을 생성해야 합니다.
+```bash
+alembic revision --autogenerate -m "설명"
+```
+생성된 `migrations/versions/*.py` 파일 내용을 검토한 뒤 커밋하세요.
 
 급여명세서 PDF에 한글을 표시하려면 한글 지원 폰트가 필요합니다. Docker/Render 환경은 `fonts-nanum` 패키지가 자동 설치되어 있고, macOS는 기본 내장된 AppleGothic을 사용합니다. 그 외 환경에서 로컬로 백엔드를 직접 실행한다면 한글 폰트를 별도로 설치해야 합니다.
 
@@ -108,4 +118,5 @@ python -m pytest -v
 
 - **소득세는 국세청이 배포한 근로소득 간이세액표(2026.03.01. 시행) 실제 데이터를 사용합니다.** 월급여 1천만원까지는 표를 그대로 조회하고, 초과분은 소득세법 시행령 별표2의 구간별 계산식을 적용합니다. 부양가족 11명 초과 시 보정 공식, 8~20세 자녀 세액공제(1명 20,830원 / 2명 45,830원 / 3명 이상 45,830원+초과 1명당 33,330원)도 반영되어 있습니다. 다만 학자금 관련 예외 등 일부 세부 규정은 반영되어 있지 않고, 세율표는 매년 개정되므로 최신 여부는 별도 확인이 필요합니다.
 - 4대보험 요율은 실제 요율에 근사한 고정 비율로 단순화되어 있으며, 건강보험 상/하한선 등은 반영되어 있지 않습니다.
+- DB 스키마는 Alembic으로 관리합니다. Docker(`CMD`)와 Render 배포, GitHub Actions E2E 테스트 모두 애플리케이션/테스트 실행 전 `alembic upgrade head`를 자동으로 실행하도록 되어 있습니다. (pytest는 매 테스트마다 새로 만드는 인메모리 SQLite에 `Base.metadata.create_all`을 그대로 사용하므로 마이그레이션과 무관합니다.)
 - `work-logs/` 디렉토리에 초기 셋팅부터 현재까지의 작업 기록이 날짜별로 정리되어 있습니다.
