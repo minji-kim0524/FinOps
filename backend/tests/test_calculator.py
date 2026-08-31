@@ -85,6 +85,24 @@ def test_calculate_net_pay_national_pension_within_range_uses_gross_pay():
     assert result.iloc[0]["national_pension"] == round(1_000_000 * 0.045)
 
 
+def test_calculate_net_pay_health_insurance_applies_upper_cap():
+    # 건강보험료 자체의 상한액(근로자 부담분 4,591,740원)을 넘으면 상한액으로 고정된다.
+    df = pd.DataFrame([{"gross_pay": 150_000_000, "num_dependents": 1}])
+
+    result = calculate_net_pay(df)
+
+    assert result.iloc[0]["health_insurance"] == 4_591_740
+
+
+def test_calculate_net_pay_health_insurance_applies_lower_floor():
+    # 건강보험료 자체의 하한액(근로자 부담분 10,080원)보다 낮으면 하한액으로 고정된다.
+    df = pd.DataFrame([{"gross_pay": 200_000, "num_dependents": 1}])
+
+    result = calculate_net_pay(df)
+
+    assert result.iloc[0]["health_insurance"] == 10_080
+
+
 def test_calculate_net_pay_multiple_rows():
     df = pd.DataFrame(
         [

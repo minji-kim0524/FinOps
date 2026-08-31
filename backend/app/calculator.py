@@ -17,6 +17,12 @@ RATES = {
 NATIONAL_PENSION_INCOME_FLOOR = 400_000
 NATIONAL_PENSION_INCOME_CAP = 6_370_000
 
+# 건강보험료 상・하한액(2026.1.1. 시행, 보건복지부고시 제2025-222호).
+# 국민연금과 달리 소득 기준이 아니라 계산된 보험료 자체의 상/하한이다.
+# 고시된 금액은 근로자+회사 합산액이라, 절반(근로자 부담분)으로 나눈 값을 사용한다.
+HEALTH_INSURANCE_PREMIUM_FLOOR = 10_080
+HEALTH_INSURANCE_PREMIUM_CAP = 4_591_740
+
 # 지방소득세는 항상 소득세의 10%
 LOCAL_INCOME_TAX_RATE = 0.1
 
@@ -30,7 +36,11 @@ def calculate_net_pay(df: pd.DataFrame) -> pd.DataFrame:
         lower=NATIONAL_PENSION_INCOME_FLOOR, upper=NATIONAL_PENSION_INCOME_CAP
     )
     df["national_pension"] = (pension_base * RATES["national_pension"]).round().astype(int)
-    df["health_insurance"] = (df["gross_pay"] * RATES["health_insurance"]).round().astype(int)
+
+    health_premium = (df["gross_pay"] * RATES["health_insurance"]).round().astype(int)
+    df["health_insurance"] = health_premium.clip(
+        lower=HEALTH_INSURANCE_PREMIUM_FLOOR, upper=HEALTH_INSURANCE_PREMIUM_CAP
+    )
     df["long_term_care"] = (df["health_insurance"] * RATES["long_term_care"]).round().astype(int)
     df["employment_insurance"] = (df["gross_pay"] * RATES["employment_insurance"]).round().astype(int)
 
