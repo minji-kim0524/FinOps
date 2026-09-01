@@ -1,9 +1,11 @@
 import io
 import os
 import re
+from datetime import datetime
+from typing import Optional
 
 import pandas as pd
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
@@ -336,14 +338,47 @@ async def calculate_bulk(
 
 
 @app.get("/records")
-def list_records(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_records(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    search: str = "",
+    employee_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    min_gross_pay: Optional[int] = None,
+    max_gross_pay: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
+
+    if search:
+        query = query.filter(SalaryRecord.employee_name.ilike(f"%{search}%"))
+    if employee_name:
+        query = query.filter(SalaryRecord.employee_name == employee_name)
+    if start_date:
+        query = query.filter(SalaryRecord.created_at >= datetime.fromisoformat(start_date))
+    if end_date:
+        query = query.filter(SalaryRecord.created_at <= datetime.fromisoformat(end_date))
+    if min_gross_pay is not None:
+        query = query.filter(SalaryRecord.gross_pay >= min_gross_pay)
+    if max_gross_pay is not None:
+        query = query.filter(SalaryRecord.gross_pay <= max_gross_pay)
+
+    total = query.count()
     records = (
-        db.query(SalaryRecord)
-        .filter(SalaryRecord.owner_id == current_user.id)
-        .order_by(SalaryRecord.id)
+        query.order_by(SalaryRecord.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
-    return [_serialize(record) for record in records]
+
+    return {
+        "items": [_serialize(record) for record in records],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @app.get("/records/export")

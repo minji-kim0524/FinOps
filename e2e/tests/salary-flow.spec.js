@@ -53,6 +53,36 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
   await expect(page.getByRole("button", { name: "로그인" })).toBeVisible();
 });
 
+test("이력이 10건을 넘으면 서버 사이드 페이지네이션으로 다음 페이지를 불러온다", async ({ page }) => {
+  const username = `e2epage${Date.now()}`;
+  const password = "e2epass123";
+
+  await page.goto("/");
+
+  await page.getByText("회원가입", { exact: true }).click();
+  await page.getByLabel("아이디").fill(username);
+  await page.getByLabel("비밀번호").fill(password);
+  await page.getByLabel("보안 질문").click();
+  await page.getByTitle("가장 좋아하는 음식은 무엇인가요?").click();
+  await page.getByLabel("보안 답변").fill("김치찌개");
+  await page.getByRole("button", { name: "회원가입" }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  const employeeNameInput = page.getByPlaceholder("직원명", { exact: true });
+  for (let i = 1; i <= 12; i++) {
+    await employeeNameInput.fill(`직원${i}`);
+    await page.getByPlaceholder("세전 급여").fill("3000000");
+    await page.getByRole("button", { name: "계산하기" }).click();
+    await expect(employeeNameInput).toHaveValue(""); // 제출 성공 시 폼이 초기화됨
+  }
+
+  const historyTable = page.getByRole("table").first();
+  await expect(historyTable.getByRole("row")).toHaveCount(11); // 헤더 1행 + 데이터 10행
+
+  await page.getByTitle("2").locator("a").click();
+  await expect(historyTable.getByRole("row")).toHaveCount(3); // 헤더 1행 + 데이터 2행
+});
+
 test("보안 질문으로 비밀번호 재설정 후 새 비밀번호로 로그인", async ({ page }) => {
   const username = `e2ereset${Date.now()}`;
   const password = "oldpass123";

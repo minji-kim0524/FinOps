@@ -28,7 +28,9 @@ def test_records_endpoint_returns_saved_calculations(client):
     response = client.get("/records")
 
     assert response.status_code == 200
-    records = response.json()
+    body = response.json()
+    assert body["total"] == 2
+    records = body["items"]
     assert len(records) == 2
     assert records[0]["gross_pay"] == 3_000_000
     assert records[1]["gross_pay"] == 5_000_000
@@ -57,7 +59,8 @@ def test_calculate_bulk_endpoint(client):
     assert records[1]["net_pay"] == 4_192_415
 
     saved = client.get("/records").json()
-    assert len(saved) == 2
+    assert saved["total"] == 2
+    assert len(saved["items"]) == 2
 
 
 def test_calculate_bulk_endpoint_defaults_missing_columns(client):
@@ -110,7 +113,8 @@ def test_calculate_bulk_endpoint_skips_invalid_rows_and_reports_them(client):
     assert all("gross_pay" in e["reason"] for e in body["errors"])
 
     saved = client.get("/records").json()
-    assert len(saved) == 1
+    assert saved["total"] == 1
+    assert len(saved["items"]) == 1
 
 
 def test_update_record_recalculates_values(client):
@@ -130,8 +134,8 @@ def test_update_record_recalculates_values(client):
     assert body["net_pay"] == 4_192_415
 
     saved = client.get("/records").json()
-    assert len(saved) == 1
-    assert saved[0]["gross_pay"] == 5_000_000
+    assert len(saved["items"]) == 1
+    assert saved["items"][0]["gross_pay"] == 5_000_000
 
 
 def test_update_record_not_found(client):
@@ -146,7 +150,7 @@ def test_delete_record(client):
     response = client.delete(f"/records/{created['id']}")
 
     assert response.status_code == 200
-    assert client.get("/records").json() == []
+    assert client.get("/records").json()["items"] == []
 
 
 def test_delete_record_not_found(client):

@@ -21,10 +21,10 @@ def test_records_are_scoped_to_owner(client):
     response = client.get("/records", headers=other_headers)
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["items"] == []
 
     own_records = client.get("/records").json()
-    assert len(own_records) == 1
+    assert len(own_records["items"]) == 1
 
 
 def test_cannot_update_other_users_record(client):
@@ -38,7 +38,7 @@ def test_cannot_update_other_users_record(client):
     assert response.status_code == 404
 
     unchanged = client.get("/records").json()
-    assert unchanged[0]["gross_pay"] == 3_000_000
+    assert unchanged["items"][0]["gross_pay"] == 3_000_000
 
 
 def test_cannot_delete_other_users_record(client):
@@ -50,4 +50,4 @@ def test_cannot_delete_other_users_record(client):
     assert response.status_code == 404
 
     still_there = client.get("/records").json()
-    assert len(still_there) == 1
+    assert len(still_there["items"]) == 1

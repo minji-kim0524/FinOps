@@ -148,10 +148,14 @@ function AppContent({ onLogout }) {
   const [editForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const [records, setRecords] = useState([]);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const [summary, setSummary] = useState([]);
   const [yearlySummary, setYearlySummary] = useState([]);
   const [employeeSummary, setEmployeeSummary] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [dateRange, setDateRange] = useState(null);
   const [minGrossPay, setMinGrossPay] = useState(null);
@@ -173,10 +177,21 @@ function AppContent({ onLogout }) {
 
   const fetchRecords = async () => {
     try {
-      const response = await api.get("/records");
-      setRecords(response.data);
+      const params = { page, page_size: pageSize };
+      if (debouncedSearchText) params.search = debouncedSearchText;
+      if (selectedEmployee) params.employee_name = selectedEmployee;
+      if (dateRange?.[0]) params.start_date = dateRange[0].startOf("day").format("YYYY-MM-DDTHH:mm:ss");
+      if (dateRange?.[1]) params.end_date = dateRange[1].endOf("day").format("YYYY-MM-DDTHH:mm:ss");
+      if (minGrossPay != null) params.min_gross_pay = minGrossPay;
+      if (maxGrossPay != null) params.max_gross_pay = maxGrossPay;
+
+      const response = await api.get("/records", { params });
+      setRecords(response.data.items);
+      setTotalRecords(response.data.total);
+      return response.data;
     } catch (err) {
       reportError(err, "계산 이력을 불러오지 못했습니다.");
+      return null;
     }
   };
 
@@ -216,9 +231,25 @@ function AppContent({ onLogout }) {
     ]);
   };
 
+  // 검색어는 입력할 때마다 바로 요청하지 않고, 타이핑이 멈춘 뒤 반영한다.
   useEffect(() => {
-    refreshAll();
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  useEffect(() => {
+    fetchSummary();
+    fetchYearlySummary();
+    fetchEmployeeSummary();
   }, []);
+
+  useEffect(() => {
+    fetchRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearchText, selectedEmployee, dateRange, minGrossPay, maxGrossPay]);
 
   const handleSubmit = async (values) => {
     try {
@@ -364,7 +395,11 @@ function AppContent({ onLogout }) {
   const handleDelete = async (id) => {
     try {
       await api.delete(`/records/${id}`);
-      await refreshAll();
+      const result = await fetchRecords();
+      if (result && result.items.length === 0 && page > 1) {
+        setPage((p) => p - 1);
+      }
+      await Promise.all([fetchSummary(), fetchYearlySummary(), fetchEmployeeSummary()]);
       message.success("삭제되었습니다.");
     } catch (err) {
       reportError(err, "삭제에 실패했습니다.");
@@ -383,38 +418,21 @@ function AppContent({ onLogout }) {
 
   const resetFilters = () => {
     setSearchText("");
+    setDebouncedSearchText("");
     setSelectedEmployee(null);
     setDateRange(null);
     setMinGrossPay(null);
     setMaxGrossPay(null);
+    setPage(1);
   };
 
+  // 직원 필터 드롭다운은 전체 이력을 대상으로 하는 직원별 집계에서 목록을 가져온다.
+  // (records는 현재 페이지분만 있어 일부 직원이 빠질 수 있음)
   const employeeOptions = useMemo(() => {
-    const names = [...new Set(records.map((r) => r.employee_name).filter(Boolean))].sort();
-    return names.map((name) => ({ label: name, value: name }));
-  }, [records]);
-
-  const filteredRecords = useMemo(() => {
-    const rangeStart = dateRange?.[0]?.startOf("day").valueOf();
-    const rangeEnd = dateRange?.[1]?.endOf("day").valueOf();
-
-    return records.filter((record) => {
-      const matchesName = (record.employee_name || "")
-        .toLowerCase()
-        .includes(searchText.toLowerCase());
-
-      const matchesEmployee = !selectedEmployee || record.employee_name === selectedEmployee;
-
-      const createdAt = dayjs(record.created_at).valueOf();
-      const matchesDate =
-        (!rangeStart || createdAt >= rangeStart) && (!rangeEnd || createdAt <= rangeEnd);
-
-      const matchesMin = minGrossPay == null || record.gross_pay >= minGrossPay;
-      const matchesMax = maxGrossPay == null || record.gross_pay <= maxGrossPay;
-
-      return matchesName && matchesEmployee && matchesDate && matchesMin && matchesMax;
-    });
-  }, [records, searchText, selectedEmployee, dateRange, minGrossPay, maxGrossPay]);
+    return employeeSummary
+      .filter((row) => row.employee_name !== "(미지정)")
+      .map((row) => ({ label: row.employee_name, value: row.employee_name }));
+  }, [employeeSummary]);
 
   return (
     <div className="app">
@@ -481,43 +499,60 @@ function AppContent({ onLogout }) {
           allowClear
           showSearch
           value={selectedEmployee}
-          onChange={setSelectedEmployee}
+          onChange={(value) => {
+            setSelectedEmployee(value);
+            setPage(1);
+          }}
           options={employeeOptions}
           style={{ width: 160 }}
         />
         <DatePicker.RangePicker
           placeholder={["계산일 시작", "계산일 끝"]}
           value={dateRange}
-          onChange={(value) => setDateRange(value)}
+          onChange={(value) => {
+            setDateRange(value);
+            setPage(1);
+          }}
         />
         <InputNumber
           placeholder="최소 급여"
           min={0}
           value={minGrossPay}
-          onChange={setMinGrossPay}
+          onChange={(value) => {
+            setMinGrossPay(value);
+            setPage(1);
+          }}
           style={{ width: 140 }}
         />
         <InputNumber
           placeholder="최대 급여"
           min={0}
           value={maxGrossPay}
-          onChange={setMaxGrossPay}
+          onChange={(value) => {
+            setMaxGrossPay(value);
+            setPage(1);
+          }}
           style={{ width: 140 }}
         />
         <Button onClick={resetFilters}>필터 초기화</Button>
       </Space>
 
       <Table
-        dataSource={filteredRecords}
+        dataSource={records}
         columns={columns}
         rowKey="id"
-        pagination={{ pageSize: 10 }}
+        pagination={{
+          current: page,
+          pageSize,
+          total: totalRecords,
+          onChange: (newPage) => setPage(newPage),
+        }}
         scroll={{ x: "max-content" }}
       />
 
-      <h2>세전 급여 vs 실수령액</h2>
+      <h2>세전 급여 vs 실수령액 (현재 페이지)</h2>
       <ResponsiveContainer width="100%" height={320}>
-        <BarChart data={filteredRecords}>
+        <BarChart data={records}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="employee_name" />
           <YAxis tickFormatter={(value) => (value / 10000).toLocaleString() + "만"} />

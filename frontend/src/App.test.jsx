@@ -17,7 +17,12 @@ describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
-    api.get.mockResolvedValue({ data: [] });
+    api.get.mockImplementation((url) => {
+      if (url === "/records") {
+        return Promise.resolve({ data: { items: [], total: 0, page: 1, page_size: 10 } });
+      }
+      return Promise.resolve({ data: [] });
+    });
   });
 
   it("토큰이 없으면 로그인 화면을 보여준다", () => {
@@ -34,7 +39,10 @@ describe("App", () => {
 
     expect(await screen.findByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith("/records");
+      expect(api.get).toHaveBeenCalledWith(
+        "/records",
+        expect.objectContaining({ params: expect.objectContaining({ page: 1, page_size: 10 }) })
+      );
       expect(api.get).toHaveBeenCalledWith("/records/summary");
       expect(api.get).toHaveBeenCalledWith("/records/summary/yearly");
       expect(api.get).toHaveBeenCalledWith("/records/summary/by-employee");
