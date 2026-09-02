@@ -495,6 +495,7 @@ function AppContent({ onLogout }) {
           style={{ width: 220 }}
         />
         <Select
+          aria-label="직원 선택"
           placeholder="직원 선택"
           allowClear
           showSearch
@@ -724,7 +725,14 @@ function App() {
 
   return (
     <ConfigProvider
-      theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}
+      theme={{
+        algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+        // antd 기본 placeholder 색상은 명암 대비가 낮아(라이트 1.8:1, 다크 2.3:1) WCAG AA(4.5:1)에
+        // 못 미친다. 두 테마 모두 4.5:1 이상이 되도록 불투명도를 높여 덮어쓴다.
+        token: {
+          colorTextPlaceholder: isDark ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.55)",
+        },
+      }}
     >
       <AntApp>
         <Button
