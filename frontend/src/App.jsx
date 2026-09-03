@@ -446,6 +446,7 @@ function AppContent({ onLogout }) {
 
       <Form
         name="calculate-form"
+        className="calculate-form"
         form={form}
         layout="inline"
         onFinish={handleSubmit}

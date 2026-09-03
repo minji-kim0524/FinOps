@@ -29,6 +29,34 @@
   white-space: nowrap;
 }
 
+/* 좁은 화면에서는 긴 버튼 라벨과 고정 폭 입력창이 페이지 자체를 가로로 넘치게 만들어서,
+   전체 필드/버튼을 세로로 쌓고 폭을 100%로 맞춘다. */
+@media (max-width: 480px) {
+  .calculate-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .calculate-form .ant-form-item {
+    margin-inline-end: 0;
+    width: 100%;
+  }
+  .calculate-form .ant-input-number,
+  .calculate-form .ant-input {
+    width: 100% !important;
+  }
+
+  .bulk-upload {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bulk-upload .ant-btn {
+    width: 100%;
+    height: auto;
+    white-space: normal;
+    text-align: left;
+  }
+}
+
 .login-page {
   display: flex;
   align-items: center;

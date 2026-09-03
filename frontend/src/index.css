@@ -110,6 +110,10 @@ h1 {
     font-size: 36px;
     margin: 20px 0;
   }
+  @media (max-width: 480px) {
+    font-size: 26px;
+    margin: 12px 0;
+  }
 }
 h2 {
   font-size: 24px;

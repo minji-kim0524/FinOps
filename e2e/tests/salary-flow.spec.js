@@ -124,3 +124,33 @@ test("보안 질문으로 비밀번호 재설정 후 새 비밀번호로 로그�
 
   await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
 });
+
+test.describe("모바일 뷰포트", () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test("모바일 화면에서는 페이지 전체가 가로로 스크롤되지 않는다", async ({ page }) => {
+    const username = `e2emobile${Date.now()}`;
+    const password = "e2epass123";
+
+    await page.goto("/");
+
+    await page.getByText("회원가입", { exact: true }).click();
+    await page.getByLabel("아이디").fill(username);
+    await page.getByLabel("비밀번호").fill(password);
+    await page.getByLabel("보안 질문").click();
+    await page.getByTitle("가장 좋아하는 음식은 무엇인가요?").click();
+    await page.getByLabel("보안 답변").fill("김치찌개");
+    await page.getByRole("button", { name: "회원가입" }).click();
+    await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+    await page.getByPlaceholder("직원명", { exact: true }).fill("홍길동");
+    await page.getByPlaceholder("세전 급여").fill("3000000");
+    await page.getByRole("button", { name: "계산하기" }).click();
+    await expect(page.getByRole("table").first().getByRole("row", { name: /홍길동/ })).toBeVisible();
+
+    const hasHorizontalScroll = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+    );
+    expect(hasHorizontalScroll).toBe(false);
+  });
+});
