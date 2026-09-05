@@ -54,6 +54,7 @@ FinOps/
 │   │   ├── database.py     # DB 연결 설정
 │   │   └── data/           # 근로소득 간이세액표 원본 데이터 CSV
 │   ├── migrations/          # Alembic 마이그레이션 스크립트
+│   ├── scripts/              # DB 백업/복원 스크립트
 │   ├── alembic.ini
 │   ├── tests/               # pytest 테스트
 │   └── Dockerfile
@@ -114,6 +115,20 @@ cd backend
 python -m pytest -v
 ```
 `main` 브랜치에 push/PR이 생기면 GitHub Actions가 pytest와 프론트엔드 빌드를 자동으로 검증합니다.
+
+### DB 백업/복원
+
+Render 무료 플랜 PostgreSQL은 일정 기간이 지나면 정지(suspend)·만료될 수 있어, 운영 DB는 별도로 백업해두는 것이 안전합니다. `backend/scripts/`에 pg_dump/psql 기반 백업·복원 스크립트가 있습니다.
+
+```bash
+cd backend
+# 백업 (Render 대시보드 > finops-db > External Connection String 사용)
+DATABASE_URL=postgresql://user:pass@host:5432/dbname ./scripts/backup_db.sh
+
+# 복원 (기존 데이터를 덮어쓰므로 실행 시 확인 프롬프트가 뜬다)
+DATABASE_URL=postgresql://user:pass@host:5432/dbname ./scripts/restore_db.sh backups/finops_backup_20260905_120000.sql.gz
+```
+백업 파일은 `backend/backups/`에 타임스탬프가 붙은 `.sql.gz`로 저장되며, 이 디렉터리는 git에 커밋되지 않습니다. 로컬 개발용 SQLite(`finops.db`)는 파일을 그대로 복사하면 되므로 이 스크립트 대상이 아닙니다.
 
 ## 참고 사항
 
