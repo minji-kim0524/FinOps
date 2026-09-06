@@ -34,6 +34,7 @@
 - React (Vite)
 - Ant Design (UI 컴포넌트), Recharts (차트)
 - axios
+- Vitest + React Testing Library (단위 테스트), Playwright (E2E), oxlint (린트)
 
 ### Infra
 - Docker, docker-compose (백엔드+프론트엔드+PostgreSQL 로컬 통합 실행)
@@ -45,7 +46,13 @@
 FinOps/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py         # FastAPI 라우트
+│   │   ├── main.py         # 앱 조립 (CORS, rate limit 예외 핸들러, 헬스체크, 라우터 등록)
+│   │   ├── schemas.py      # Pydantic 요청/응답 스키마
+│   │   ├── routers/
+│   │   │   ├── auth.py     # 인증 엔드포인트 (회원가입/로그인/비밀번호)
+│   │   │   └── records.py  # 급여 계산/이력/집계 엔드포인트
+│   │   ├── services/
+│   │   │   └── records.py  # 이력 관련 순수 DB 조회·직렬화 로직 (라우터와 분리)
 │   │   ├── calculator.py   # pandas 기반 공제·실수령액 계산 로직
 │   │   ├── tax_table.py    # 국세청 근로소득 간이세액표 조회 + 1천만원 초과 구간 계산식
 │   │   ├── payslip.py      # 급여명세서 PDF 생성 (reportlab)
@@ -60,14 +67,22 @@ FinOps/
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx          # 메인 화면 (입력 폼·이력 표·차트·집계)
-│   │   ├── LoginPage.jsx    # 로그인/회원가입 화면
-│   │   └── api.js           # axios 인스턴스 (토큰 자동 첨부)
+│   │   ├── App.jsx           # 화면 조립 (컴포넌트 구성, 모달·폼 상태)
+│   │   ├── hooks/
+│   │   │   ├── useSalaryRecords.jsx  # 이력 조회·필터·페이지네이션·업로드·다운로드 로직
+│   │   │   ├── useTheme.js           # 다크모드 상태/저장
+│   │   │   └── useErrorReporter.js   # 인증 만료 등 공통 에러 처리
+│   │   ├── components/        # 프레젠테이션 컴포넌트 (계산 폼, 필터, 모달, 차트, 집계 표)
+│   │   ├── tableColumns.jsx   # 이력/집계 표 컬럼 정의
+│   │   ├── utils/              # 공용 유틸 (blob 다운로드, 금액 포맷)
+│   │   ├── LoginPage.jsx      # 로그인/회원가입 화면
+│   │   └── api.js             # axios 인스턴스 (토큰 자동 첨부)
 │   └── Dockerfile
-├── docker-compose.yml        # 로컬 통합 실행 (backend + frontend + postgres)
-├── render.yaml                # Render 배포 Blueprint
-├── .github/workflows/ci.yml   # GitHub Actions CI (pytest, 프론트 빌드)
-└── work-logs/                 # 날짜별 작업 기록
+├── e2e/                        # Playwright E2E 테스트
+├── docker-compose.yml          # 로컬 통합 실행 (backend + frontend + postgres)
+├── render.yaml                  # Render 배포 Blueprint
+├── .github/workflows/ci.yml     # GitHub Actions CI (pytest, 프론트 빌드/테스트, E2E)
+└── work-logs/                   # 날짜별 작업 기록
 ```
 
 ## 시작하기
@@ -111,10 +126,16 @@ docker compose up --build
 ### 테스트
 
 ```bash
-cd backend
-python -m pytest -v
+# 백엔드 단위/통합 테스트
+cd backend && python -m pytest -v
+
+# 프론트엔드 단위 테스트
+cd frontend && npm run test
+
+# E2E 테스트 (백엔드·프론트엔드가 모두 실행 중이어야 함)
+cd e2e && npx playwright test
 ```
-`main` 브랜치에 push/PR이 생기면 GitHub Actions가 pytest와 프론트엔드 빌드를 자동으로 검증합니다.
+`main` 브랜치에 push/PR이 생기면 GitHub Actions가 pytest, 프론트엔드 빌드/테스트, E2E 테스트를 자동으로 검증합니다.
 
 ### DB 백업/복원
 
