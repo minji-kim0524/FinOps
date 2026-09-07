@@ -17,6 +17,7 @@ def validate_password_strength(password: str) -> str:
 
 class SalaryInput(BaseModel):
     gross_pay: int
+    bonus_pay: int = 0
     num_dependents: int = 1
     num_children_8_to_20: int = 0
     employee_name: str = ""

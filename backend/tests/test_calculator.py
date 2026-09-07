@@ -103,6 +103,42 @@ def test_calculate_net_pay_health_insurance_applies_lower_floor():
     assert result.iloc[0]["health_insurance"] == 10_080
 
 
+def test_calculate_net_pay_bonus_pay_is_added_to_regular_pay_for_deductions():
+    # 상여금은 세전 급여와 합산된 금액을 기준으로 4대보험료·소득세가 계산된다는 점을,
+    # "세전 급여 4,000,000원 단독" 케이스와 동일한 결과가 나오는지로 검증한다.
+    with_bonus = calculate_net_pay(
+        pd.DataFrame([{"gross_pay": 3_000_000, "bonus_pay": 1_000_000, "num_dependents": 1}])
+    ).iloc[0]
+    combined_only = calculate_net_pay(
+        pd.DataFrame([{"gross_pay": 4_000_000, "num_dependents": 1}])
+    ).iloc[0]
+
+    for column in [
+        "national_pension",
+        "health_insurance",
+        "long_term_care",
+        "employment_insurance",
+        "income_tax",
+        "local_income_tax",
+        "total_deduction",
+    ]:
+        assert with_bonus[column] == combined_only[column]
+
+    # gross_pay 컬럼 자체는 상여금과 분리되어 원래 값(3,000,000원)을 그대로 유지한다.
+    assert with_bonus["gross_pay"] == 3_000_000
+    # 실수령액은 세전 급여+상여금 합계에서 공제액을 뺀 값이다.
+    assert with_bonus["net_pay"] == 3_000_000 + 1_000_000 - with_bonus["total_deduction"]
+
+
+def test_calculate_net_pay_without_bonus_pay_column_defaults_to_zero():
+    with_column = calculate_net_pay(
+        pd.DataFrame([{"gross_pay": 3_000_000, "bonus_pay": 0, "num_dependents": 1}])
+    ).iloc[0]
+    without_column = calculate_net_pay(pd.DataFrame([{"gross_pay": 3_000_000, "num_dependents": 1}])).iloc[0]
+
+    assert with_column["net_pay"] == without_column["net_pay"]
+
+
 def test_calculate_net_pay_multiple_rows():
     df = pd.DataFrame(
         [

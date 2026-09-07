@@ -14,6 +14,25 @@ def test_calculate_endpoint(client):
     assert datetime.fromisoformat(body["created_at"])
 
 
+def test_calculate_endpoint_with_bonus_pay(client):
+    response = client.post(
+        "/calculate", json={"gross_pay": 3_000_000, "bonus_pay": 1_000_000, "num_dependents": 1}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gross_pay"] == 3_000_000
+    assert body["bonus_pay"] == 1_000_000
+    assert body["net_pay"] == 3_408_281
+
+
+def test_calculate_endpoint_defaults_bonus_pay_to_zero(client):
+    response = client.post("/calculate", json={"gross_pay": 3_000_000})
+
+    assert response.status_code == 200
+    assert response.json()["bonus_pay"] == 0
+
+
 def test_calculate_endpoint_defaults_to_one_dependent(client):
     response = client.post("/calculate", json={"gross_pay": 3_000_000})
 
@@ -63,6 +82,23 @@ def test_calculate_bulk_endpoint(client):
     assert len(saved["items"]) == 2
 
 
+def test_calculate_bulk_endpoint_with_bonus_pay_column(client):
+    csv_content = (
+        "employee_name,gross_pay,bonus_pay,num_dependents\n"
+        "홍길동,3000000,1000000,1\n"
+    ).encode("utf-8")
+
+    response = client.post(
+        "/calculate/bulk",
+        files={"file": ("salaries.csv", csv_content, "text/csv")},
+    )
+
+    assert response.status_code == 200
+    record = response.json()["created"][0]
+    assert record["bonus_pay"] == 1_000_000
+    assert record["net_pay"] == 3_408_281
+
+
 def test_calculate_bulk_endpoint_defaults_missing_columns(client):
     csv_content = "gross_pay\n3000000\n".encode("utf-8")
 
@@ -74,6 +110,7 @@ def test_calculate_bulk_endpoint_defaults_missing_columns(client):
     assert response.status_code == 200
     record = response.json()["created"][0]
     assert record["employee_name"] == ""
+    assert record["bonus_pay"] == 0
     assert record["num_dependents"] == 1
 
 

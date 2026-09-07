@@ -56,9 +56,12 @@ def build_payslip_pdf(record: SalaryRecord) -> bytes:
         Spacer(1, 8 * mm),
     ]
 
+    total_pay = record.gross_pay + record.bonus_pay
     rows = [
         ["항목", "금액"],
         ["세전 급여", _won(record.gross_pay)],
+        ["상여금/성과급", _won(record.bonus_pay)],
+        ["세전 총 지급액", _won(total_pay)],
         ["국민연금", _won(record.national_pension)],
         ["건강보험", _won(record.health_insurance)],
         ["장기요양보험", _won(record.long_term_care)],

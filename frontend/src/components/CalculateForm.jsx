@@ -8,13 +8,16 @@ function CalculateForm({ form, onFinish }) {
       form={form}
       layout="inline"
       onFinish={onFinish}
-      initialValues={{ num_dependents: 1, num_children_8_to_20: 0 }}
+      initialValues={{ bonus_pay: 0, num_dependents: 1, num_children_8_to_20: 0 }}
     >
       <Form.Item name="employee_name">
         <Input placeholder="직원명" />
       </Form.Item>
       <Form.Item name="gross_pay" rules={[{ required: true, message: "세전 급여를 입력하세요" }]}>
         <InputNumber placeholder="세전 급여" min={0} style={{ width: 160 }} />
+      </Form.Item>
+      <Form.Item name="bonus_pay">
+        <InputNumber placeholder="상여금/성과급" min={0} style={{ width: 160 }} />
       </Form.Item>
       <Form.Item name="num_dependents" rules={[{ required: true, message: "부양가족 수를 입력하세요" }]}>
         <InputNumber placeholder="부양가족 수" min={1} style={{ width: 120 }} />

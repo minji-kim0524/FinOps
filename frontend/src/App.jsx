@@ -27,6 +27,7 @@ function toSalaryPayload(values) {
   return {
     employee_name: values.employee_name || "",
     gross_pay: values.gross_pay,
+    bonus_pay: values.bonus_pay || 0,
     num_dependents: values.num_dependents,
     num_children_8_to_20: values.num_children_8_to_20 || 0,
   };
@@ -48,7 +49,7 @@ function AppContent({ onLogout }) {
     try {
       await salary.submitCalculation(toSalaryPayload(values));
       form.resetFields();
-      form.setFieldsValue({ num_dependents: 1, num_children_8_to_20: 0 });
+      form.setFieldsValue({ bonus_pay: 0, num_dependents: 1, num_children_8_to_20: 0 });
       message.success("계산이 완료되었습니다.");
     } catch (err) {
       reportError(err, "계산 요청에 실패했습니다.");
@@ -60,6 +61,7 @@ function AppContent({ onLogout }) {
     editForm.setFieldsValue({
       employee_name: record.employee_name,
       gross_pay: record.gross_pay,
+      bonus_pay: record.bonus_pay,
       num_dependents: record.num_dependents,
       num_children_8_to_20: record.num_children_8_to_20,
     });

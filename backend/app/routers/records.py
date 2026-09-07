@@ -51,14 +51,17 @@ async def calculate_bulk(
 
     if "employee_name" not in df.columns:
         df["employee_name"] = ""
+    if "bonus_pay" not in df.columns:
+        df["bonus_pay"] = 0
     if "num_dependents" not in df.columns:
         df["num_dependents"] = 1
     if "num_children_8_to_20" not in df.columns:
         df["num_children_8_to_20"] = 0
 
     # gross_pay는 필수: 비어있거나 숫자가 아니거나 음수인 행은 저장하지 않고 오류로 보고한다.
-    # num_dependents/num_children_8_to_20은 선택 항목이라, 비어있거나 숫자가 아니면 기본값으로 보정한다.
+    # bonus_pay/num_dependents/num_children_8_to_20은 선택 항목이라, 비어있거나 숫자가 아니면 기본값으로 보정한다.
     df["gross_pay"] = pd.to_numeric(df["gross_pay"], errors="coerce")
+    df["bonus_pay"] = pd.to_numeric(df["bonus_pay"], errors="coerce").fillna(0).clip(lower=0)
     df["num_dependents"] = pd.to_numeric(df["num_dependents"], errors="coerce").fillna(1).clip(lower=1)
     df["num_children_8_to_20"] = (
         pd.to_numeric(df["num_children_8_to_20"], errors="coerce").fillna(0).clip(lower=0)
@@ -74,6 +77,7 @@ async def calculate_bulk(
     # to_numeric/clip을 거치며 float64가 된 컬럼을 정수로 되돌린다.
     # (income_tax_table과의 merge_asof는 dtype이 일치해야 하므로 float로 두면 실패한다)
     valid_df["gross_pay"] = valid_df["gross_pay"].astype(int)
+    valid_df["bonus_pay"] = valid_df["bonus_pay"].astype(int)
     valid_df["num_dependents"] = valid_df["num_dependents"].astype(int)
     valid_df["num_children_8_to_20"] = valid_df["num_children_8_to_20"].astype(int)
     records = save_calculated_records(valid_df, db, current_user.id) if not valid_df.empty else []

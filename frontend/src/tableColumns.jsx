@@ -44,6 +44,7 @@ export function buildRecordColumns({ onEdit, onDelete, onDownloadPayslip }) {
       render: (value) => value || "-",
     },
     numericColumn("세전 급여", "gross_pay", 130),
+    numericColumn("상여금/성과급", "bonus_pay", 140),
     {
       title: "부양가족 수",
       dataIndex: "num_dependents",

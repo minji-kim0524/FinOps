@@ -39,6 +39,16 @@ def test_monthly_summary_groups_by_month(client):
     assert data[current_month]["total_net_pay"] == 2_636_093
 
 
+def test_monthly_summary_total_gross_pay_includes_bonus_pay(client):
+    client.post("/calculate", json={"gross_pay": 3_000_000, "bonus_pay": 1_000_000, "num_dependents": 1})
+
+    response = client.get("/records/summary")
+
+    current_month = datetime.utcnow().strftime("%Y-%m")
+    data = {row["month"]: row for row in response.json()}
+    assert data[current_month]["total_gross_pay"] == 4_000_000
+
+
 def test_yearly_summary_empty(client):
     response = client.get("/records/summary/yearly")
 

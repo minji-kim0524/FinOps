@@ -23,6 +23,7 @@ class SalaryRecord(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     employee_name = Column(String, nullable=False, default="")
     gross_pay = Column(Integer, nullable=False)
+    bonus_pay = Column(Integer, nullable=False, default=0)
     num_dependents = Column(Integer, nullable=False)
     num_children_8_to_20 = Column(Integer, nullable=False, default=0)
     national_pension = Column(Integer, nullable=False)

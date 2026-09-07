@@ -31,20 +31,24 @@ def calculate_net_pay(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     if "num_children_8_to_20" not in df.columns:
         df["num_children_8_to_20"] = 0
+    if "bonus_pay" not in df.columns:
+        df["bonus_pay"] = 0
 
-    pension_base = df["gross_pay"].clip(
-        lower=NATIONAL_PENSION_INCOME_FLOOR, upper=NATIONAL_PENSION_INCOME_CAP
-    )
+    # 상여금/성과급은 정기 급여와 같은 달에 합산 지급되는 경우로 가정해, 4대보험료와
+    # 소득세(간이세액표 조회) 모두 세전 급여 + 상여금을 기준으로 계산한다.
+    total_pay = df["gross_pay"] + df["bonus_pay"]
+
+    pension_base = total_pay.clip(lower=NATIONAL_PENSION_INCOME_FLOOR, upper=NATIONAL_PENSION_INCOME_CAP)
     df["national_pension"] = (pension_base * RATES["national_pension"]).round().astype(int)
 
-    health_premium = (df["gross_pay"] * RATES["health_insurance"]).round().astype(int)
+    health_premium = (total_pay * RATES["health_insurance"]).round().astype(int)
     df["health_insurance"] = health_premium.clip(
         lower=HEALTH_INSURANCE_PREMIUM_FLOOR, upper=HEALTH_INSURANCE_PREMIUM_CAP
     )
     df["long_term_care"] = (df["health_insurance"] * RATES["long_term_care"]).round().astype(int)
-    df["employment_insurance"] = (df["gross_pay"] * RATES["employment_insurance"]).round().astype(int)
+    df["employment_insurance"] = (total_pay * RATES["employment_insurance"]).round().astype(int)
 
-    table_income_tax = lookup_income_tax(df)
+    table_income_tax = lookup_income_tax(df.assign(gross_pay=total_pay))
     child_credit = df["num_children_8_to_20"].apply(child_tax_credit)
     df["income_tax"] = (table_income_tax - child_credit).clip(lower=0).astype(int)
     df["local_income_tax"] = (df["income_tax"] * LOCAL_INCOME_TAX_RATE).round().astype(int)
@@ -57,6 +61,6 @@ def calculate_net_pay(df: pd.DataFrame) -> pd.DataFrame:
         + df["income_tax"]
         + df["local_income_tax"]
     )
-    df["net_pay"] = df["gross_pay"] - df["total_deduction"]
+    df["net_pay"] = total_pay - df["total_deduction"]
 
     return df

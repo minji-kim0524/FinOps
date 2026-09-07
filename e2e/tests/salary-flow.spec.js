@@ -53,6 +53,39 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
   await expect(page.getByRole("button", { name: "로그인" })).toBeVisible();
 });
 
+test("상여금/성과급을 입력하면 세전 급여와 합산되어 실수령액에 반영된다", async ({ page }) => {
+  const username = `e2ebonus${Date.now()}`;
+  const password = "e2epass123";
+
+  await page.goto("/");
+
+  await page.getByText("회원가입", { exact: true }).click();
+  await page.getByLabel("아이디").fill(username);
+  await page.getByLabel("비밀번호").fill(password);
+  await page.getByLabel("보안 질문").click();
+  await page.getByTitle("가장 좋아하는 음식은 무엇인가요?").click();
+  await page.getByLabel("보안 답변").fill("김치찌개");
+  await page.getByRole("button", { name: "회원가입" }).click();
+  await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+
+  await page.getByPlaceholder("직원명", { exact: true }).fill("김보너스");
+  await page.getByPlaceholder("세전 급여").fill("3000000");
+  await page.getByPlaceholder("상여금/성과급").fill("1000000");
+  await page.getByRole("button", { name: "계산하기" }).click();
+
+  const historyTable = page.getByRole("table").first();
+  const row = historyTable.getByRole("row", { name: /김보너스/ });
+  await expect(row).toContainText("3,000,000원");
+  await expect(row).toContainText("1,000,000원");
+  await expect(row).toContainText("3,408,281원");
+
+  // 수정 모달에도 상여금 값이 그대로 채워져 있는지 확인
+  await row.getByRole("button", { name: "수정" }).click();
+  const editDialog = page.getByRole("dialog", { name: "계산 이력 수정" });
+  await expect(editDialog.getByLabel("상여금/성과급")).toHaveValue("1000000");
+  await editDialog.getByRole("button", { name: "취소" }).click();
+});
+
 test("이력이 10건을 넘으면 서버 사이드 페이지네이션으로 다음 페이지를 불러온다", async ({ page }) => {
   const username = `e2epage${Date.now()}`;
   const password = "e2epass123";

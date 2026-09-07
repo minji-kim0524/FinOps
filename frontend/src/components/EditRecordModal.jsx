@@ -21,6 +21,9 @@ function EditRecordModal({ open, form, onOk, onCancel, onFinish }) {
         >
           <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
+        <Form.Item name="bonus_pay" label="상여금/성과급">
+          <InputNumber style={{ width: "100%" }} min={0} />
+        </Form.Item>
         <Form.Item
           name="num_dependents"
           label="부양가족 수"

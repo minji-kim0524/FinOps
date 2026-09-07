@@ -18,6 +18,7 @@ def test_export_records_returns_xlsx_with_data(client):
     assert list(df.columns) == [
         "직원명",
         "세전 급여",
+        "상여금/성과급",
         "부양가족 수",
         "8~20세 자녀 수",
         "국민연금",

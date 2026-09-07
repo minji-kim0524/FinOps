@@ -14,6 +14,7 @@ from app.models import SalaryRecord
 EXPORT_COLUMN_LABELS = {
     "employee_name": "직원명",
     "gross_pay": "세전 급여",
+    "bonus_pay": "상여금/성과급",
     "num_dependents": "부양가족 수",
     "num_children_8_to_20": "8~20세 자녀 수",
     "national_pension": "국민연금",
@@ -33,6 +34,7 @@ def serialize_record(record: SalaryRecord) -> dict:
         "created_at": record.created_at.isoformat(),
         "employee_name": record.employee_name,
         "gross_pay": record.gross_pay,
+        "bonus_pay": record.bonus_pay,
         "num_dependents": record.num_dependents,
         "num_children_8_to_20": record.num_children_8_to_20,
         "national_pension": record.national_pension,
@@ -49,6 +51,7 @@ def serialize_record(record: SalaryRecord) -> dict:
 def apply_calculated_fields(record: SalaryRecord, row: dict) -> None:
     record.employee_name = str(row.get("employee_name", ""))
     record.gross_pay = int(row["gross_pay"])
+    record.bonus_pay = int(row.get("bonus_pay", 0))
     record.num_dependents = int(row["num_dependents"])
     record.num_children_8_to_20 = int(row.get("num_children_8_to_20", 0))
     record.national_pension = int(row["national_pension"])
@@ -96,7 +99,8 @@ def build_group_summary(records: list[SalaryRecord], group_key: str, group_value
         [
             {
                 group_key: group_value(record),
-                "gross_pay": record.gross_pay,
+                # 집계상 "세전 급여"는 상여금/성과급을 포함한 실제 세전 총 지급액을 의미한다.
+                "gross_pay": record.gross_pay + record.bonus_pay,
                 "total_deduction": record.total_deduction,
                 "net_pay": record.net_pay,
             }
