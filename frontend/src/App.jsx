@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { App as AntApp, Button, ConfigProvider, Form, Space, Table, theme as antdTheme } from "antd";
 import { MoonOutlined, SunOutlined } from "@ant-design/icons";
 import "antd/dist/reset.css";
@@ -19,9 +19,14 @@ import BulkActions from "./components/BulkActions";
 import RecordFilters from "./components/RecordFilters";
 import EditRecordModal from "./components/EditRecordModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
-import GrossPayVsNetPayChart from "./components/GrossPayVsNetPayChart";
-import MonthlyTrendChart from "./components/MonthlyTrendChart";
 import SummaryTable from "./components/SummaryTable";
+
+// recharts는 vendor 청크 하나만으로도 용량이 커서(gzip 약 110KB), 화면 하단에 있는 차트
+// 두 개에서만 쓰는 이 라이브러리를 초기 번들에서 분리해 필요할 때만 불러온다.
+const GrossPayVsNetPayChart = lazy(() => import("./components/GrossPayVsNetPayChart"));
+const MonthlyTrendChart = lazy(() => import("./components/MonthlyTrendChart"));
+
+const CHART_FALLBACK = <div style={{ height: 320 }} />;
 
 function toSalaryPayload(values) {
   return {
@@ -166,10 +171,14 @@ function AppContent({ onLogout }) {
       />
 
       <h2>세전 급여 vs 실수령액 (현재 페이지)</h2>
-      <GrossPayVsNetPayChart data={salary.records} />
+      <Suspense fallback={CHART_FALLBACK}>
+        <GrossPayVsNetPayChart data={salary.records} />
+      </Suspense>
 
       <h2>월별 추이</h2>
-      <MonthlyTrendChart data={salary.summary} />
+      <Suspense fallback={CHART_FALLBACK}>
+        <MonthlyTrendChart data={salary.summary} />
+      </Suspense>
 
       <SummaryTable
         title="월별 집계"
