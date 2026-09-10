@@ -10,5 +10,3 @@ pyjwt
 openpyxl
 reportlab
 slowapi
-pytest
-httpx
