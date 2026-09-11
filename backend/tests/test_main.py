@@ -1,5 +1,16 @@
 from datetime import datetime
 
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+
+def test_health_check():
+    response = TestClient(app).get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
 
 def test_calculate_endpoint(client):
     response = client.post("/calculate", json={"gross_pay": 3_000_000, "num_dependents": 1})
@@ -112,6 +123,16 @@ def test_calculate_bulk_endpoint_defaults_missing_columns(client):
     assert record["employee_name"] == ""
     assert record["bonus_pay"] == 0
     assert record["num_dependents"] == 1
+
+
+def test_calculate_bulk_endpoint_unparseable_csv(client):
+    response = client.post(
+        "/calculate/bulk",
+        files={"file": ("salaries.csv", b"", "text/csv")},
+    )
+
+    assert response.status_code == 400
+    assert "CSV 파일을 읽을 수 없습니다" in response.json()["detail"]
 
 
 def test_calculate_bulk_endpoint_missing_gross_pay_column(client):

@@ -1,11 +1,13 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models import User
 from tests.conftest import (
     TEST_PASSWORD,
     TEST_SECURITY_ANSWER,
     TEST_SECURITY_QUESTION,
     TEST_USERNAME,
+    TestingSessionLocal,
 )
 
 REGISTER_DEFAULTS = {
@@ -111,6 +113,19 @@ def test_protected_endpoint_rejects_invalid_token(client):
     )
 
     assert response.status_code == 401
+
+
+def test_protected_endpoint_rejects_token_for_deleted_user(client):
+    # 토큰 자체는 유효하지만, 발급 이후 계정이 삭제된 경우를 재현한다.
+    db = TestingSessionLocal()
+    db.query(User).filter(User.username == TEST_USERNAME).delete()
+    db.commit()
+    db.close()
+
+    response = client.get("/records")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "User not found"
 
 
 def test_get_security_question(client):

@@ -1,3 +1,17 @@
+import pytest
+
+from app import payslip
+
+
+def test_register_font_raises_when_no_candidate_font_exists(monkeypatch):
+    # 서버에 나눔고딕/AppleGothic 둘 다 없는 배포 환경(예: 커스텀 베이스 이미지)을 재현한다.
+    monkeypatch.setattr(payslip.pdfmetrics, "getRegisteredFontNames", lambda: [])
+    monkeypatch.setattr(payslip.Path, "exists", lambda self: False)
+
+    with pytest.raises(RuntimeError, match="한글 폰트를 찾을 수 없습니다"):
+        payslip._register_font()
+
+
 def test_download_payslip_returns_pdf(client):
     created = client.post(
         "/calculate", json={"employee_name": "홍길동", "gross_pay": 3_000_000, "num_dependents": 1}

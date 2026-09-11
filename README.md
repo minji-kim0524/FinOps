@@ -28,7 +28,7 @@
 - SQLAlchemy + PostgreSQL(배포)/SQLite(로컬 기본값)
 - Alembic (DB 스키마 마이그레이션)
 - JWT(pyjwt) + bcrypt 기반 인증
-- pytest (단위/통합 테스트)
+- pytest, pytest-cov (단위/통합 테스트 및 커버리지 측정)
 
 ### Frontend
 - React (Vite)
@@ -138,6 +138,14 @@ cd frontend && npm run test
 cd e2e && npx playwright test
 ```
 `main` 브랜치에 push/PR이 생기면 GitHub Actions가 pytest, 프론트엔드 빌드/테스트, E2E 테스트를 자동으로 검증합니다.
+
+백엔드 테스트 커버리지는 `pytest-cov`로 측정합니다 (측정 대상은 `backend/.coveragerc`에서 `app/`으로 한정).
+```bash
+cd backend
+python -m pytest --cov --cov-report=term-missing   # 터미널에 라인별 미검증 위치 출력
+python -m pytest --cov --cov-report=html            # htmlcov/index.html로 상세 리포트 확인
+```
+CI에서도 매 실행마다 커버리지를 측정해 `coverage-report` 아티팩트(HTML)로 남깁니다.
 
 ### DB 백업/복원
 

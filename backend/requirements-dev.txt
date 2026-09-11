@@ -1,4 +1,5 @@
 # 로컬 개발/테스트 전용 의존성. 배포 이미지(Dockerfile)에는 requirements.txt만 설치한다.
 -r requirements.txt
 pytest
+pytest-cov
 httpx
