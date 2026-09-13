@@ -1,5 +1,4 @@
 import io
-from datetime import datetime
 from typing import Optional
 
 import pandas as pd
@@ -16,6 +15,7 @@ from app.schemas import SalaryInput
 from app.services.records import (
     EXPORT_COLUMN_LABELS,
     apply_calculated_fields,
+    apply_record_filters,
     build_group_summary,
     get_owned_record_or_404,
     save_calculated_records,
@@ -102,19 +102,15 @@ def list_records(
     current_user: User = Depends(get_current_user),
 ):
     query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
-
-    if search:
-        query = query.filter(SalaryRecord.employee_name.ilike(f"%{search}%"))
-    if employee_name:
-        query = query.filter(SalaryRecord.employee_name == employee_name)
-    if start_date:
-        query = query.filter(SalaryRecord.created_at >= datetime.fromisoformat(start_date))
-    if end_date:
-        query = query.filter(SalaryRecord.created_at <= datetime.fromisoformat(end_date))
-    if min_gross_pay is not None:
-        query = query.filter(SalaryRecord.gross_pay >= min_gross_pay)
-    if max_gross_pay is not None:
-        query = query.filter(SalaryRecord.gross_pay <= max_gross_pay)
+    query = apply_record_filters(
+        query,
+        search=search,
+        employee_name=employee_name,
+        start_date=start_date,
+        end_date=end_date,
+        min_gross_pay=min_gross_pay,
+        max_gross_pay=max_gross_pay,
+    )
 
     total = query.count()
     records = (
@@ -133,13 +129,27 @@ def list_records(
 
 
 @router.get("/records/export")
-def export_records(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = (
-        db.query(SalaryRecord)
-        .filter(SalaryRecord.owner_id == current_user.id)
-        .order_by(SalaryRecord.id)
-        .all()
+def export_records(
+    search: str = "",
+    employee_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    min_gross_pay: Optional[int] = None,
+    max_gross_pay: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
+    query = apply_record_filters(
+        query,
+        search=search,
+        employee_name=employee_name,
+        start_date=start_date,
+        end_date=end_date,
+        min_gross_pay=min_gross_pay,
+        max_gross_pay=max_gross_pay,
     )
+    records = query.order_by(SalaryRecord.id).all()
 
     rows = [serialize_record(record) for record in records]
     columns = list(EXPORT_COLUMN_LABELS.keys())

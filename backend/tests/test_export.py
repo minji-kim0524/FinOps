@@ -35,6 +35,30 @@ def test_export_records_returns_xlsx_with_data(client):
     assert int(df.iloc[0]["실수령액"]) == 2_636_093
 
 
+def test_export_records_filters_by_employee_name(client):
+    client.post("/calculate", json={"employee_name": "홍길동", "gross_pay": 3_000_000, "num_dependents": 1})
+    client.post("/calculate", json={"employee_name": "김철수", "gross_pay": 5_000_000, "num_dependents": 1})
+
+    response = client.get("/records/export", params={"employee_name": "홍길동"})
+
+    df = pd.read_excel(io.BytesIO(response.content))
+    assert len(df) == 1
+    assert df.iloc[0]["직원명"] == "홍길동"
+
+
+def test_export_records_filters_by_gross_pay_range(client):
+    client.post("/calculate", json={"employee_name": "홍길동", "gross_pay": 3_000_000, "num_dependents": 1})
+    client.post("/calculate", json={"employee_name": "김철수", "gross_pay": 5_000_000, "num_dependents": 1})
+
+    response = client.get(
+        "/records/export", params={"min_gross_pay": 4_000_000, "max_gross_pay": 6_000_000}
+    )
+
+    df = pd.read_excel(io.BytesIO(response.content))
+    assert len(df) == 1
+    assert df.iloc[0]["직원명"] == "김철수"
+
+
 def test_export_records_empty(client):
     response = client.get("/records/export")
 

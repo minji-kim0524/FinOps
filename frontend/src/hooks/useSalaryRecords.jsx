@@ -25,15 +25,21 @@ export function useSalaryRecords({ message, modal, onLogout }) {
 
   const reportError = useErrorReporter({ message, onLogout });
 
+  // 이력 목록 조회와 엑셀 내보내기가 "현재 적용된 필터"를 동일하게 서버에 전달하기 위한 공통 파라미터.
+  const buildFilterParams = () => {
+    const params = {};
+    if (debouncedSearchText) params.search = debouncedSearchText;
+    if (selectedEmployee) params.employee_name = selectedEmployee;
+    if (dateRange?.[0]) params.start_date = dateRange[0].startOf("day").format("YYYY-MM-DDTHH:mm:ss");
+    if (dateRange?.[1]) params.end_date = dateRange[1].endOf("day").format("YYYY-MM-DDTHH:mm:ss");
+    if (minGrossPay != null) params.min_gross_pay = minGrossPay;
+    if (maxGrossPay != null) params.max_gross_pay = maxGrossPay;
+    return params;
+  };
+
   const fetchRecords = async () => {
     try {
-      const params = { page, page_size: PAGE_SIZE };
-      if (debouncedSearchText) params.search = debouncedSearchText;
-      if (selectedEmployee) params.employee_name = selectedEmployee;
-      if (dateRange?.[0]) params.start_date = dateRange[0].startOf("day").format("YYYY-MM-DDTHH:mm:ss");
-      if (dateRange?.[1]) params.end_date = dateRange[1].endOf("day").format("YYYY-MM-DDTHH:mm:ss");
-      if (minGrossPay != null) params.min_gross_pay = minGrossPay;
-      if (maxGrossPay != null) params.max_gross_pay = maxGrossPay;
+      const params = { page, page_size: PAGE_SIZE, ...buildFilterParams() };
 
       const response = await api.get("/records", { params });
       setRecords(response.data.items);
@@ -137,7 +143,10 @@ export function useSalaryRecords({ message, modal, onLogout }) {
   const exportToExcel = async () => {
     setExporting(true);
     try {
-      const response = await api.get("/records/export", { responseType: "blob" });
+      const response = await api.get("/records/export", {
+        params: buildFilterParams(),
+        responseType: "blob",
+      });
       downloadBlob(response.data, "salary_records.xlsx");
     } catch (err) {
       reportError(err, "엑셀 다운로드에 실패했습니다.");

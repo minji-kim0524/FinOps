@@ -4,8 +4,12 @@
 DataFrame을 오가는 변환 로직만 모아둔다.
 """
 
+from datetime import datetime
+from typing import Optional
+
 import pandas as pd
 from fastapi import HTTPException
+from sqlalchemy.orm import Query as SAQuery
 from sqlalchemy.orm import Session
 
 from app.calculator import calculate_net_pay
@@ -26,6 +30,32 @@ EXPORT_COLUMN_LABELS = {
     "total_deduction": "공제액 합계",
     "net_pay": "실수령액",
 }
+
+
+def apply_record_filters(
+    query: SAQuery,
+    *,
+    search: str = "",
+    employee_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    min_gross_pay: Optional[int] = None,
+    max_gross_pay: Optional[int] = None,
+) -> SAQuery:
+    """이력 목록 조회(/records)와 엑셀 내보내기(/records/export)가 공유하는 검색/필터 조건."""
+    if search:
+        query = query.filter(SalaryRecord.employee_name.ilike(f"%{search}%"))
+    if employee_name:
+        query = query.filter(SalaryRecord.employee_name == employee_name)
+    if start_date:
+        query = query.filter(SalaryRecord.created_at >= datetime.fromisoformat(start_date))
+    if end_date:
+        query = query.filter(SalaryRecord.created_at <= datetime.fromisoformat(end_date))
+    if min_gross_pay is not None:
+        query = query.filter(SalaryRecord.gross_pay >= min_gross_pay)
+    if max_gross_pay is not None:
+        query = query.filter(SalaryRecord.gross_pay <= max_gross_pay)
+    return query
 
 
 def serialize_record(record: SalaryRecord) -> dict:
