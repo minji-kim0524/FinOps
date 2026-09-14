@@ -140,6 +140,7 @@ function AppContent({ onLogout }) {
         onUpload={salary.uploadBulkCsv}
         exporting={salary.exporting}
         onExport={salary.exportToExcel}
+        onDownloadTemplate={salary.downloadCsvTemplate}
       />
 
       <RecordFilters

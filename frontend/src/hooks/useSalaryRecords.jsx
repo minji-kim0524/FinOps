@@ -161,6 +161,15 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     }
   };
 
+  const downloadCsvTemplate = async () => {
+    try {
+      const response = await api.get("/records/csv-template", { responseType: "blob" });
+      downloadBlob(response.data, "salary_upload_template.csv");
+    } catch (err) {
+      reportError(err, "CSV 템플릿 다운로드에 실패했습니다.");
+    }
+  };
+
   const downloadPayslip = async (id) => {
     try {
       const response = await api.get(`/records/${id}/payslip`, { responseType: "blob" });
@@ -258,6 +267,7 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     submitCalculation,
     uploadBulkCsv,
     exportToExcel,
+    downloadCsvTemplate,
     downloadPayslip,
     updateRecord,
     deleteRecord,

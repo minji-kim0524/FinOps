@@ -89,6 +89,23 @@ async def calculate_bulk(
     }
 
 
+@router.get("/records/csv-template")
+def download_csv_template():
+    # 로그인 없이도 CSV 형식을 미리 확인할 수 있도록 인증을 요구하지 않는 정적 콘텐츠로 둔다.
+    # Excel(특히 한글 Windows)에서 한글이 깨지지 않도록 UTF-8 BOM을 포함해 인코딩한다.
+    csv_content = (
+        "employee_name,gross_pay,bonus_pay,num_dependents,num_children_8_to_20\n"
+        "홍길동,3000000,0,1,0\n"
+        "김철수,3500000,500000,2,1\n"
+    )
+
+    return StreamingResponse(
+        io.BytesIO(csv_content.encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=salary_upload_template.csv"},
+    )
+
+
 @router.get("/records")
 def list_records(
     page: int = Query(1, ge=1),

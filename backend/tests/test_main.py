@@ -66,6 +66,33 @@ def test_records_endpoint_returns_saved_calculations(client):
     assert records[1]["gross_pay"] == 5_000_000
 
 
+def test_csv_template_download_requires_no_auth():
+    response = TestClient(app).get("/records/csv-template")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert "salary_upload_template.csv" in response.headers["content-disposition"]
+    assert response.content.startswith(b"\xef\xbb\xbf")  # UTF-8 BOM
+
+
+def test_csv_template_is_accepted_by_bulk_upload(client):
+    # 템플릿과 실제 업로드 파서(calculate_bulk)가 서로 어긋나지 않는지, 템플릿을 그대로
+    # 업로드해 실제로 정상 계산되는지로 검증한다.
+    template = TestClient(app).get("/records/csv-template").content
+
+    response = client.post(
+        "/calculate/bulk",
+        files={"file": ("salary_upload_template.csv", template, "text/csv")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["errors"] == []
+    assert len(body["created"]) == 2
+    assert body["created"][0]["employee_name"] == "홍길동"
+    assert body["created"][1]["bonus_pay"] == 500_000
+
+
 def test_calculate_bulk_endpoint(client):
     csv_content = (
         "employee_name,gross_pay,num_dependents\n"
