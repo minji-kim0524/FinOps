@@ -85,3 +85,48 @@ def test_records_date_range_filter_excludes_out_of_range(client):
 
     body = response.json()
     assert body["total"] == 0
+
+
+def test_records_sort_by_gross_pay_ascending(client):
+    _create(client, employee_name="중간", gross_pay=5_000_000)
+    _create(client, employee_name="최저", gross_pay=2_000_000)
+    _create(client, employee_name="최고", gross_pay=8_000_000)
+
+    response = client.get("/records", params={"sort_by": "gross_pay", "sort_order": "asc"})
+
+    names = [item["employee_name"] for item in response.json()["items"]]
+    assert names == ["최저", "중간", "최고"]
+
+
+def test_records_sort_by_gross_pay_descending(client):
+    _create(client, employee_name="중간", gross_pay=5_000_000)
+    _create(client, employee_name="최저", gross_pay=2_000_000)
+    _create(client, employee_name="최고", gross_pay=8_000_000)
+
+    response = client.get("/records", params={"sort_by": "gross_pay", "sort_order": "desc"})
+
+    names = [item["employee_name"] for item in response.json()["items"]]
+    assert names == ["최고", "중간", "최저"]
+
+
+def test_records_sort_applies_across_pages_not_just_current_page(client):
+    # 정렬이 서버에서 이뤄지므로, 페이지를 넘겨도 전체 이력 기준으로 정렬된 순서가 이어져야 한다.
+    for gross_pay in [7_000_000, 1_000_000, 9_000_000, 3_000_000, 5_000_000]:
+        _create(client, gross_pay=gross_pay)
+
+    response = client.get(
+        "/records", params={"sort_by": "gross_pay", "sort_order": "asc", "page_size": 2, "page": 2}
+    )
+
+    gross_pays = [item["gross_pay"] for item in response.json()["items"]]
+    assert gross_pays == [5_000_000, 7_000_000]
+
+
+def test_records_invalid_sort_by_falls_back_to_default_order(client):
+    first = _create(client, employee_name="첫번째")
+    second = _create(client, employee_name="두번째")
+
+    response = client.get("/records", params={"sort_by": "not_a_real_column"})
+
+    ids = [item["id"] for item in response.json()["items"]]
+    assert ids == [first["id"], second["id"]]

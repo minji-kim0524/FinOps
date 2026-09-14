@@ -8,7 +8,7 @@ const numericColumn = (title, dataIndex, width = 120) => ({
   key: dataIndex,
   align: "right",
   width,
-  sorter: (a, b) => a[dataIndex] - b[dataIndex],
+  sorter: true,
   render: formatWon,
 });
 
@@ -32,7 +32,7 @@ export function buildRecordColumns({ onEdit, onDelete, onDownloadPayslip }) {
       dataIndex: "created_at",
       key: "created_at",
       width: 150,
-      sorter: (a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf(),
+      sorter: true,
       render: (value) => dayjs(value).format("YYYY-MM-DD HH:mm"),
     },
     {
@@ -40,7 +40,7 @@ export function buildRecordColumns({ onEdit, onDelete, onDownloadPayslip }) {
       dataIndex: "employee_name",
       key: "employee_name",
       width: 120,
-      sorter: (a, b) => a.employee_name.localeCompare(b.employee_name),
+      sorter: true,
       render: (value) => value || "-",
     },
     numericColumn("세전 급여", "gross_pay", 130),
@@ -51,7 +51,7 @@ export function buildRecordColumns({ onEdit, onDelete, onDownloadPayslip }) {
       key: "num_dependents",
       align: "right",
       width: 120,
-      sorter: (a, b) => a.num_dependents - b.num_dependents,
+      sorter: true,
       render: (value) => value + "명",
     },
     {
@@ -60,7 +60,7 @@ export function buildRecordColumns({ onEdit, onDelete, onDownloadPayslip }) {
       key: "num_children_8_to_20",
       align: "right",
       width: 130,
-      sorter: (a, b) => a.num_children_8_to_20 - b.num_children_8_to_20,
+      sorter: true,
       render: (value) => value + "명",
     },
     numericColumn("국민연금", "national_pension"),

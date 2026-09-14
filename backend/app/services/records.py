@@ -58,6 +58,39 @@ def apply_record_filters(
     return query
 
 
+# 이력 표(프론트엔드)에서 정렬을 허용하는 컬럼. SalaryRecord의 실제 컬럼명과 1:1로 대응하며,
+# 임의 문자열로 getattr(SalaryRecord, ...)을 호출하지 않도록 화이트리스트로만 검사한다.
+SORTABLE_RECORD_FIELDS = frozenset(
+    {
+        "created_at",
+        "employee_name",
+        "gross_pay",
+        "bonus_pay",
+        "num_dependents",
+        "num_children_8_to_20",
+        "national_pension",
+        "health_insurance",
+        "long_term_care",
+        "employment_insurance",
+        "income_tax",
+        "local_income_tax",
+        "total_deduction",
+        "net_pay",
+    }
+)
+
+
+def apply_record_sort(query: SAQuery, sort_by: Optional[str], sort_order: str) -> SAQuery:
+    """이력 목록(/records)의 정렬 조건. sort_by가 없거나 허용되지 않은 컬럼이면 기본(id) 정렬을 쓴다."""
+    if sort_by not in SORTABLE_RECORD_FIELDS:
+        return query.order_by(SalaryRecord.id)
+
+    column = getattr(SalaryRecord, sort_by)
+    column = column.desc() if sort_order == "desc" else column.asc()
+    # 값이 같은 행이 여러 개일 때도 페이지마다 순서가 흔들리지 않도록 id를 보조 정렬 기준으로 둔다.
+    return query.order_by(column, SalaryRecord.id)
+
+
 def serialize_record(record: SalaryRecord) -> dict:
     return {
         "id": record.id,

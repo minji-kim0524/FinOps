@@ -16,6 +16,7 @@ from app.services.records import (
     EXPORT_COLUMN_LABELS,
     apply_calculated_fields,
     apply_record_filters,
+    apply_record_sort,
     build_group_summary,
     get_owned_record_or_404,
     save_calculated_records,
@@ -98,6 +99,8 @@ def list_records(
     end_date: Optional[str] = None,
     min_gross_pay: Optional[int] = None,
     max_gross_pay: Optional[int] = None,
+    sort_by: Optional[str] = None,
+    sort_order: str = "asc",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -114,7 +117,7 @@ def list_records(
 
     total = query.count()
     records = (
-        query.order_by(SalaryRecord.id)
+        apply_record_sort(query, sort_by, sort_order)
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()

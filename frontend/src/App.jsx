@@ -165,7 +165,10 @@ function AppContent({ onLogout }) {
           current: salary.page,
           pageSize: salary.pageSize,
           total: salary.totalRecords,
-          onChange: (newPage) => salary.setPage(newPage),
+        }}
+        onChange={(pagination, _filters, sorter) => {
+          salary.setPage(pagination.current);
+          salary.updateSort(sorter.field, sorter.order);
         }}
         scroll={{ x: "max-content" }}
       />

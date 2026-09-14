@@ -20,6 +20,8 @@ export function useSalaryRecords({ message, modal, onLogout }) {
   const [dateRange, setDateRange] = useState(null);
   const [minGrossPay, setMinGrossPay] = useState(null);
   const [maxGrossPay, setMaxGrossPay] = useState(null);
+  const [sortBy, setSortBy] = useState(null);
+  const [sortOrder, setSortOrder] = useState(null); // "asc" | "desc" | null
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -40,6 +42,10 @@ export function useSalaryRecords({ message, modal, onLogout }) {
   const fetchRecords = async () => {
     try {
       const params = { page, page_size: PAGE_SIZE, ...buildFilterParams() };
+      if (sortBy) {
+        params.sort_by = sortBy;
+        params.sort_order = sortOrder;
+      }
 
       const response = await api.get("/records", { params });
       setRecords(response.data.items);
@@ -91,7 +97,7 @@ export function useSalaryRecords({ message, modal, onLogout }) {
   useEffect(() => {
     fetchRecords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchText, selectedEmployee, dateRange, minGrossPay, maxGrossPay]);
+  }, [page, debouncedSearchText, selectedEmployee, dateRange, minGrossPay, maxGrossPay, sortBy, sortOrder]);
 
   const submitCalculation = async (payload) => {
     await api.post("/calculate", payload);
@@ -214,6 +220,17 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     setPage(1);
   };
 
+  // antd Table의 onChange(pagination, filters, sorter)에서 그대로 전달받는 정렬 정보.
+  // 정렬이 실제로 바뀐 경우에만 1페이지로 되돌리고, 페이지 이동만으로 호출된 경우(정렬 불변)는 그대로 둔다.
+  const updateSort = (field, antdOrder) => {
+    const nextSortBy = antdOrder ? field : null;
+    const nextSortOrder = antdOrder === "descend" ? "desc" : antdOrder === "ascend" ? "asc" : null;
+    if (nextSortBy === sortBy && nextSortOrder === sortOrder) return;
+    setSortBy(nextSortBy);
+    setSortOrder(nextSortOrder);
+    setPage(1);
+  };
+
   return {
     records,
     totalRecords,
@@ -234,6 +251,7 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     updateMinGrossPay,
     maxGrossPay,
     updateMaxGrossPay,
+    updateSort,
     uploading,
     exporting,
     resetFilters,
