@@ -1,4 +1,5 @@
 import io
+import zipfile
 from typing import Optional
 
 import pandas as pd
@@ -185,6 +186,47 @@ def export_records(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=salary_records.xlsx"},
+    )
+
+
+@router.get("/records/payslips")
+def download_payslips_zip(
+    search: str = "",
+    employee_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    min_gross_pay: Optional[int] = None,
+    max_gross_pay: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """현재(또는 전체) 이력의 급여명세서 PDF를 한 번에 ZIP으로 묶어 내려받는다.
+
+    /records, /records/export와 동일한 필터를 지원해, 화면에서 좁혀둔 범위만
+    ZIP에 포함시킬 수 있다.
+    """
+    query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
+    query = apply_record_filters(
+        query,
+        search=search,
+        employee_name=employee_name,
+        start_date=start_date,
+        end_date=end_date,
+        min_gross_pay=min_gross_pay,
+        max_gross_pay=max_gross_pay,
+    )
+    records = query.order_by(SalaryRecord.id).all()
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for record in records:
+            zip_file.writestr(f"payslip_{record.id}.pdf", build_payslip_pdf(record))
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=salary_payslips.zip"},
     )
 
 

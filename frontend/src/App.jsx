@@ -141,6 +141,8 @@ function AppContent({ onLogout }) {
         exporting={salary.exporting}
         onExport={salary.exportToExcel}
         onDownloadTemplate={salary.downloadCsvTemplate}
+        downloadingPayslips={salary.downloadingPayslips}
+        onDownloadPayslipsZip={salary.downloadPayslipsZip}
       />
 
       <RecordFilters

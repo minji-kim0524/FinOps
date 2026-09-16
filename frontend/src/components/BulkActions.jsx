@@ -1,7 +1,15 @@
 import { Button, Upload } from "antd";
 import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
 
-function BulkActions({ uploading, onUpload, exporting, onExport, onDownloadTemplate }) {
+function BulkActions({
+  uploading,
+  onUpload,
+  exporting,
+  onExport,
+  onDownloadTemplate,
+  downloadingPayslips,
+  onDownloadPayslipsZip,
+}) {
   return (
     <div className="bulk-upload">
       <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>
@@ -14,6 +22,9 @@ function BulkActions({ uploading, onUpload, exporting, onExport, onDownloadTempl
       </Upload>
       <Button icon={<DownloadOutlined />} loading={exporting} onClick={onExport}>
         엑셀로 내보내기
+      </Button>
+      <Button icon={<DownloadOutlined />} loading={downloadingPayslips} onClick={onDownloadPayslipsZip}>
+        급여명세서 일괄 다운로드 (ZIP, 현재 필터 적용)
       </Button>
     </div>
   );

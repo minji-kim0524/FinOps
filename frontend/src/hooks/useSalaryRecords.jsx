@@ -24,6 +24,7 @@ export function useSalaryRecords({ message, modal, onLogout }) {
   const [sortOrder, setSortOrder] = useState(null); // "asc" | "desc" | null
   const [uploading, setUploading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [downloadingPayslips, setDownloadingPayslips] = useState(false);
 
   const reportError = useErrorReporter({ message, onLogout });
 
@@ -161,6 +162,21 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     }
   };
 
+  const downloadPayslipsZip = async () => {
+    setDownloadingPayslips(true);
+    try {
+      const response = await api.get("/records/payslips", {
+        params: buildFilterParams(),
+        responseType: "blob",
+      });
+      downloadBlob(response.data, "salary_payslips.zip");
+    } catch (err) {
+      reportError(err, "급여명세서 일괄 다운로드에 실패했습니다.");
+    } finally {
+      setDownloadingPayslips(false);
+    }
+  };
+
   const downloadCsvTemplate = async () => {
     try {
       const response = await api.get("/records/csv-template", { responseType: "blob" });
@@ -263,11 +279,13 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     updateSort,
     uploading,
     exporting,
+    downloadingPayslips,
     resetFilters,
     submitCalculation,
     uploadBulkCsv,
     exportToExcel,
     downloadCsvTemplate,
+    downloadPayslipsZip,
     downloadPayslip,
     updateRecord,
     deleteRecord,
