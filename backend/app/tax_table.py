@@ -42,9 +42,13 @@ def _dependents_value(row: pd.Series, dependents: int) -> float:
 
 
 def _lookup_over_top(gross_pay: int, dependents: int) -> float:
+    """월급여 1천만원(_TOP_GROSS_PAY) 초과 구간의 세액.
+
+    유일한 호출부인 _lookup_single이 gross_pay > _TOP_GROSS_PAY일 때만 이 함수를
+    부르므로, 그 경계 확인은 여기서 반복하지 않는다. _OVER_TOP_TIERS의 마지막
+    구간은 상한(upper)이 None이라 gross_pay가 얼마든 루프 안에서 반드시 매칭된다.
+    """
     base = _dependents_value(_TOP_BRACKET, dependents)
-    if gross_pay <= _TOP_GROSS_PAY:
-        return base
 
     for lower, upper, addend, rate, apply_98pct in _OVER_TOP_TIERS:
         if upper is None or gross_pay <= upper:
@@ -53,7 +57,7 @@ def _lookup_over_top(gross_pay: int, dependents: int) -> float:
                 excess *= 0.98
             return base + addend + excess * rate
 
-    return base  # 도달하지 않음 (마지막 구간은 상한이 없음)
+    raise AssertionError("_OVER_TOP_TIERS의 마지막 구간은 상한이 없어 도달할 수 없다")
 
 
 def _lookup_single(gross_pay: int, dependents: int) -> int:
