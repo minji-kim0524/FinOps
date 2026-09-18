@@ -48,6 +48,21 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
   await page.getByRole("button", { name: "삭제" }).last().click();
   await expect(page.getByRole("cell", { name: "홍길동", exact: true })).toHaveCount(0);
 
+  // 최소/최대 급여 필터가 역전되면 안내 문구가 뜨고, 정상 범위로 되돌리면 사라진다.
+  // (별도 테스트로 두면 회원가입이 하나 더 늘어 /auth/register의 분당 5회 rate limit에
+  // 전체 스위트가 걸리기 쉬워, 이미 로그인된 이 흐름 안에서 함께 확인한다.)
+  const rangeWarning = page.getByText("최소 급여가 최대 급여보다 커서 조회 결과가 없습니다");
+  await expect(rangeWarning).toBeHidden();
+
+  await page.getByPlaceholder("최소 급여").fill("5000000");
+  await page.getByPlaceholder("최대 급여").fill("1000000");
+  await page.getByPlaceholder("최대 급여").blur();
+  await expect(rangeWarning).toBeVisible();
+
+  await page.getByPlaceholder("최소 급여").fill("1000000");
+  await page.getByPlaceholder("최소 급여").blur();
+  await expect(rangeWarning).toBeHidden();
+
   // 로그아웃
   await page.getByRole("button", { name: "로그아웃" }).click();
   await expect(page.getByRole("button", { name: "로그인" })).toBeVisible();
