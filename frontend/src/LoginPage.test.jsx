@@ -129,6 +129,18 @@ describe("LoginPage", () => {
       const err = { response: { status: 401 } };
       expect(describeAuthError(err, "login")).toBe("아이디 또는 비밀번호가 올바르지 않습니다.");
     });
+
+    it("로그인이 계정 잠금(423)으로 실패하면 백엔드가 알려준 대기 안내를 그대로 반환한다", () => {
+      const err = {
+        response: {
+          status: 423,
+          data: { detail: "로그인 실패 횟수를 초과해 계정이 잠겼습니다. 15분 후 다시 시도해주세요." },
+        },
+      };
+      expect(describeAuthError(err, "login")).toBe(
+        "로그인 실패 횟수를 초과해 계정이 잠겼습니다. 15분 후 다시 시도해주세요."
+      );
+    });
   });
 
   it("비밀번호를 잊으셨나요 클릭 시 아이디로 보안 질문을 조회하고, 답변으로 재설정한다", async () => {

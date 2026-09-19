@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models import User
+from app.rate_limit import limiter
 from tests.conftest import (
     TEST_PASSWORD,
     TEST_SECURITY_ANSWER,
@@ -95,6 +96,58 @@ def test_login_wrong_password(client):
     response = client.post("/auth/login", json={"username": TEST_USERNAME, "password": "wrongpass"})
 
     assert response.status_code == 401
+
+
+def test_login_locks_account_after_max_failed_attempts(client):
+    # client 픽스처가 셋업 중 이미 로그인을 1회 성공시켰으므로, 여기서 다시 리셋해서
+    # "5/minute" 요청 속도 제한에 걸리지 않고 정확히 5번의 "비밀번호 실패"를 소비한다.
+    limiter.reset()
+
+    for _ in range(5):
+        response = client.post(
+            "/auth/login", json={"username": TEST_USERNAME, "password": "wrongpass"}
+        )
+        assert response.status_code == 401
+
+    # 분당 요청 속도 제한(slowapi)과는 별개로 "계정" 단위로 잠기는지 확인하기 위해,
+    # 요청 속도 제한 창이 새로 시작된 상황을 가정하고 다시 리셋한다. 계정 잠금은 DB에
+    # 저장돼 있어 이 리셋의 영향을 받지 않는다.
+    limiter.reset()
+
+    # 이제는 올바른 비밀번호를 넣어도 잠금 때문에 로그인할 수 없어야 한다.
+    response = client.post("/auth/login", json={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+
+    assert response.status_code == 423
+    assert "계정이 잠겼습니다" in response.json()["detail"]
+    assert "15분" in response.json()["detail"]
+
+
+def test_login_below_lockout_threshold_still_allows_correct_login(client):
+    limiter.reset()
+
+    for _ in range(4):
+        response = client.post(
+            "/auth/login", json={"username": TEST_USERNAME, "password": "wrongpass"}
+        )
+        assert response.status_code == 401
+
+    response = client.post("/auth/login", json={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+
+    assert response.status_code == 200
+
+
+def test_login_success_resets_failed_attempt_count(client):
+    limiter.reset()
+
+    for _ in range(4):
+        client.post("/auth/login", json={"username": TEST_USERNAME, "password": "wrongpass"})
+    client.post("/auth/login", json={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+
+    db = TestingSessionLocal()
+    user = db.query(User).filter(User.username == TEST_USERNAME).first()
+    assert user.failed_login_attempts == 0
+    assert user.locked_until is None
+    db.close()
 
 
 def test_protected_endpoint_requires_auth(client):

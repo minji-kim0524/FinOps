@@ -39,6 +39,9 @@ export function describeAuthError(err, mode) {
   if (err.response.status === 429) {
     return RATE_LIMIT_MESSAGE;
   }
+  if (mode === "login" && err.response.status === 423) {
+    return err.response.data?.detail || "로그인 실패 횟수를 초과해 계정이 잠겼습니다. 잠시 후 다시 시도해주세요.";
+  }
   if (mode === "register" && err.response.status === 400) {
     return "이미 사용 중인 아이디입니다.";
   }

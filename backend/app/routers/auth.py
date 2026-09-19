@@ -2,10 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth import (
+    LOCKOUT_MINUTES,
     create_access_token,
     get_current_user,
     hash_password,
     hash_security_answer,
+    is_account_locked,
+    register_failed_login,
+    reset_login_attempts,
     verify_password,
     verify_security_answer,
 )
@@ -47,9 +51,19 @@ def register(request: Request, input: RegisterInput, db: Session = Depends(get_d
 @limiter.limit("5/minute")
 def login(request: Request, input: AuthInput, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == input.username).first()
+
+    if user is not None and is_account_locked(user):
+        raise HTTPException(
+            status_code=423,
+            detail=f"로그인 실패 횟수를 초과해 계정이 잠겼습니다. {LOCKOUT_MINUTES}분 후 다시 시도해주세요.",
+        )
+
     if user is None or not verify_password(input.password, user.hashed_password):
+        if user is not None:
+            register_failed_login(user, db)
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
+    reset_login_attempts(user, db)
     return TokenOutput(access_token=create_access_token(user.username))
 
 

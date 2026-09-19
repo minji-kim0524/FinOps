@@ -13,6 +13,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     security_question = Column(String, nullable=False)
     security_answer_hash = Column(String, nullable=False)
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
+    locked_until = Column(DateTime, nullable=True)
 
 
 class SalaryRecord(Base):
