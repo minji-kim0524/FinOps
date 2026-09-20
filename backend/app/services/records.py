@@ -4,6 +4,7 @@
 DataFrame을 오가는 변환 로직만 모아둔다.
 """
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
@@ -32,29 +33,33 @@ EXPORT_COLUMN_LABELS = {
 }
 
 
-def apply_record_filters(
-    query: SAQuery,
-    *,
-    search: str = "",
-    employee_name: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    min_gross_pay: Optional[int] = None,
-    max_gross_pay: Optional[int] = None,
-) -> SAQuery:
-    """이력 목록 조회(/records)와 엑셀 내보내기(/records/export)가 공유하는 검색/필터 조건."""
-    if search:
-        query = query.filter(SalaryRecord.employee_name.ilike(f"%{search}%"))
-    if employee_name:
-        query = query.filter(SalaryRecord.employee_name == employee_name)
-    if start_date:
-        query = query.filter(SalaryRecord.created_at >= datetime.fromisoformat(start_date))
-    if end_date:
-        query = query.filter(SalaryRecord.created_at <= datetime.fromisoformat(end_date))
-    if min_gross_pay is not None:
-        query = query.filter(SalaryRecord.gross_pay >= min_gross_pay)
-    if max_gross_pay is not None:
-        query = query.filter(SalaryRecord.gross_pay <= max_gross_pay)
+@dataclass
+class RecordFilterParams:
+    """이력 목록(/records)·엑셀 내보내기(/records/export)·명세서 ZIP(/records/payslips)이
+    공유하는 검색/필터 조건. 라우터에서 FastAPI 의존성(Depends)으로 그대로 쿼리 파라미터에 매핑된다."""
+
+    search: str = ""
+    employee_name: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    min_gross_pay: Optional[int] = None
+    max_gross_pay: Optional[int] = None
+
+
+def apply_record_filters(query: SAQuery, filters: RecordFilterParams) -> SAQuery:
+    """RecordFilterParams 조건을 쿼리에 반영한다."""
+    if filters.search:
+        query = query.filter(SalaryRecord.employee_name.ilike(f"%{filters.search}%"))
+    if filters.employee_name:
+        query = query.filter(SalaryRecord.employee_name == filters.employee_name)
+    if filters.start_date:
+        query = query.filter(SalaryRecord.created_at >= datetime.fromisoformat(filters.start_date))
+    if filters.end_date:
+        query = query.filter(SalaryRecord.created_at <= datetime.fromisoformat(filters.end_date))
+    if filters.min_gross_pay is not None:
+        query = query.filter(SalaryRecord.gross_pay >= filters.min_gross_pay)
+    if filters.max_gross_pay is not None:
+        query = query.filter(SalaryRecord.gross_pay <= filters.max_gross_pay)
     return query
 
 
@@ -127,6 +132,53 @@ def apply_calculated_fields(record: SalaryRecord, row: dict) -> None:
     record.net_pay = int(row["net_pay"])
 
 
+def parse_bulk_upload_csv(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
+    """CSV 일괄 업로드(/calculate/bulk)용 DataFrame을 검증/보정한다.
+
+    gross_pay는 필수 컬럼이라 없으면 400으로 바로 실패한다. employee_name/bonus_pay/
+    num_dependents/num_children_8_to_20은 선택 컬럼이라 없으면 기본값으로 채운다.
+    각 행의 gross_pay가 비어있거나 숫자가 아니거나 음수면 저장하지 않고 오류로 보고한다.
+    반환값은 (저장 가능한 행만 남은 DataFrame, 행별 오류 목록).
+    """
+    if "gross_pay" not in df.columns:
+        raise HTTPException(status_code=400, detail="CSV에 gross_pay 컬럼이 없습니다.")
+
+    df = df.copy()
+    if "employee_name" not in df.columns:
+        df["employee_name"] = ""
+    if "bonus_pay" not in df.columns:
+        df["bonus_pay"] = 0
+    if "num_dependents" not in df.columns:
+        df["num_dependents"] = 1
+    if "num_children_8_to_20" not in df.columns:
+        df["num_children_8_to_20"] = 0
+
+    # bonus_pay/num_dependents/num_children_8_to_20은 선택 항목이라, 비어있거나 숫자가
+    # 아니면 기본값으로 보정한다.
+    df["gross_pay"] = pd.to_numeric(df["gross_pay"], errors="coerce")
+    df["bonus_pay"] = pd.to_numeric(df["bonus_pay"], errors="coerce").fillna(0).clip(lower=0)
+    df["num_dependents"] = pd.to_numeric(df["num_dependents"], errors="coerce").fillna(1).clip(lower=1)
+    df["num_children_8_to_20"] = (
+        pd.to_numeric(df["num_children_8_to_20"], errors="coerce").fillna(0).clip(lower=0)
+    )
+
+    valid_mask = df["gross_pay"].notna() & (df["gross_pay"] >= 0)
+    errors = [
+        {"row": int(idx) + 2, "reason": "세전 급여(gross_pay) 값이 없거나 올바른 숫자가 아닙니다"}
+        for idx in df.index[~valid_mask]
+    ]
+
+    valid_df = df[valid_mask].copy()
+    # to_numeric/clip을 거치며 float64가 된 컬럼을 정수로 되돌린다.
+    # (income_tax_table과의 merge_asof는 dtype이 일치해야 하므로 float로 두면 실패한다)
+    valid_df["gross_pay"] = valid_df["gross_pay"].astype(int)
+    valid_df["bonus_pay"] = valid_df["bonus_pay"].astype(int)
+    valid_df["num_dependents"] = valid_df["num_dependents"].astype(int)
+    valid_df["num_children_8_to_20"] = valid_df["num_children_8_to_20"].astype(int)
+
+    return valid_df, errors
+
+
 def save_calculated_records(df: pd.DataFrame, db: Session, owner_id: int) -> list[SalaryRecord]:
     result_df = calculate_net_pay(df)
 
@@ -151,6 +203,16 @@ def get_owned_record_or_404(record_id: int, owner_id: int, db: Session) -> Salar
     if record is None:
         raise HTTPException(status_code=404, detail="Record not found")
     return record
+
+
+def get_owned_records_by_created_at(db: Session, owner_id: int) -> list[SalaryRecord]:
+    """월별/연도별/직원별 집계(/records/summary*)가 공유하는 조회: 소유자의 전체 이력을 계산일시 순으로."""
+    return (
+        db.query(SalaryRecord)
+        .filter(SalaryRecord.owner_id == owner_id)
+        .order_by(SalaryRecord.created_at)
+        .all()
+    )
 
 
 def build_group_summary(records: list[SalaryRecord], group_key: str, group_value) -> list[dict]:

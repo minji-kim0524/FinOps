@@ -15,11 +15,14 @@ from app.payslip import build_payslip_pdf
 from app.schemas import SalaryInput
 from app.services.records import (
     EXPORT_COLUMN_LABELS,
+    RecordFilterParams,
     apply_calculated_fields,
     apply_record_filters,
     apply_record_sort,
     build_group_summary,
     get_owned_record_or_404,
+    get_owned_records_by_created_at,
+    parse_bulk_upload_csv,
     save_calculated_records,
     serialize_record,
 )
@@ -48,40 +51,7 @@ async def calculate_bulk(
     except Exception:
         raise HTTPException(status_code=400, detail="CSV 파일을 읽을 수 없습니다.")
 
-    if "gross_pay" not in df.columns:
-        raise HTTPException(status_code=400, detail="CSV에 gross_pay 컬럼이 없습니다.")
-
-    if "employee_name" not in df.columns:
-        df["employee_name"] = ""
-    if "bonus_pay" not in df.columns:
-        df["bonus_pay"] = 0
-    if "num_dependents" not in df.columns:
-        df["num_dependents"] = 1
-    if "num_children_8_to_20" not in df.columns:
-        df["num_children_8_to_20"] = 0
-
-    # gross_pay는 필수: 비어있거나 숫자가 아니거나 음수인 행은 저장하지 않고 오류로 보고한다.
-    # bonus_pay/num_dependents/num_children_8_to_20은 선택 항목이라, 비어있거나 숫자가 아니면 기본값으로 보정한다.
-    df["gross_pay"] = pd.to_numeric(df["gross_pay"], errors="coerce")
-    df["bonus_pay"] = pd.to_numeric(df["bonus_pay"], errors="coerce").fillna(0).clip(lower=0)
-    df["num_dependents"] = pd.to_numeric(df["num_dependents"], errors="coerce").fillna(1).clip(lower=1)
-    df["num_children_8_to_20"] = (
-        pd.to_numeric(df["num_children_8_to_20"], errors="coerce").fillna(0).clip(lower=0)
-    )
-
-    valid_mask = df["gross_pay"].notna() & (df["gross_pay"] >= 0)
-    errors = [
-        {"row": int(idx) + 2, "reason": "세전 급여(gross_pay) 값이 없거나 올바른 숫자가 아닙니다"}
-        for idx in df.index[~valid_mask]
-    ]
-
-    valid_df = df[valid_mask].copy()
-    # to_numeric/clip을 거치며 float64가 된 컬럼을 정수로 되돌린다.
-    # (income_tax_table과의 merge_asof는 dtype이 일치해야 하므로 float로 두면 실패한다)
-    valid_df["gross_pay"] = valid_df["gross_pay"].astype(int)
-    valid_df["bonus_pay"] = valid_df["bonus_pay"].astype(int)
-    valid_df["num_dependents"] = valid_df["num_dependents"].astype(int)
-    valid_df["num_children_8_to_20"] = valid_df["num_children_8_to_20"].astype(int)
+    valid_df, errors = parse_bulk_upload_csv(df)
     records = save_calculated_records(valid_df, db, current_user.id) if not valid_df.empty else []
 
     return {
@@ -111,27 +81,14 @@ def download_csv_template():
 def list_records(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-    search: str = "",
-    employee_name: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    min_gross_pay: Optional[int] = None,
-    max_gross_pay: Optional[int] = None,
+    filters: RecordFilterParams = Depends(RecordFilterParams),
     sort_by: Optional[str] = None,
     sort_order: str = "asc",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
-    query = apply_record_filters(
-        query,
-        search=search,
-        employee_name=employee_name,
-        start_date=start_date,
-        end_date=end_date,
-        min_gross_pay=min_gross_pay,
-        max_gross_pay=max_gross_pay,
-    )
+    query = apply_record_filters(query, filters)
 
     total = query.count()
     records = (
@@ -151,25 +108,12 @@ def list_records(
 
 @router.get("/records/export")
 def export_records(
-    search: str = "",
-    employee_name: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    min_gross_pay: Optional[int] = None,
-    max_gross_pay: Optional[int] = None,
+    filters: RecordFilterParams = Depends(RecordFilterParams),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
-    query = apply_record_filters(
-        query,
-        search=search,
-        employee_name=employee_name,
-        start_date=start_date,
-        end_date=end_date,
-        min_gross_pay=min_gross_pay,
-        max_gross_pay=max_gross_pay,
-    )
+    query = apply_record_filters(query, filters)
     records = query.order_by(SalaryRecord.id).all()
 
     rows = [serialize_record(record) for record in records]
@@ -191,12 +135,7 @@ def export_records(
 
 @router.get("/records/payslips")
 def download_payslips_zip(
-    search: str = "",
-    employee_name: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    min_gross_pay: Optional[int] = None,
-    max_gross_pay: Optional[int] = None,
+    filters: RecordFilterParams = Depends(RecordFilterParams),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -206,15 +145,7 @@ def download_payslips_zip(
     ZIP에 포함시킬 수 있다.
     """
     query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
-    query = apply_record_filters(
-        query,
-        search=search,
-        employee_name=employee_name,
-        start_date=start_date,
-        end_date=end_date,
-        min_gross_pay=min_gross_pay,
-        max_gross_pay=max_gross_pay,
-    )
+    query = apply_record_filters(query, filters)
     records = query.order_by(SalaryRecord.id).all()
 
     buffer = io.BytesIO()
@@ -232,37 +163,19 @@ def download_payslips_zip(
 
 @router.get("/records/summary")
 def monthly_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = (
-        db.query(SalaryRecord)
-        .filter(SalaryRecord.owner_id == current_user.id)
-        .order_by(SalaryRecord.created_at)
-        .all()
-    )
-
+    records = get_owned_records_by_created_at(db, current_user.id)
     return build_group_summary(records, "month", lambda r: r.created_at.strftime("%Y-%m"))
 
 
 @router.get("/records/summary/yearly")
 def yearly_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = (
-        db.query(SalaryRecord)
-        .filter(SalaryRecord.owner_id == current_user.id)
-        .order_by(SalaryRecord.created_at)
-        .all()
-    )
-
+    records = get_owned_records_by_created_at(db, current_user.id)
     return build_group_summary(records, "year", lambda r: r.created_at.strftime("%Y"))
 
 
 @router.get("/records/summary/by-employee")
 def employee_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = (
-        db.query(SalaryRecord)
-        .filter(SalaryRecord.owner_id == current_user.id)
-        .order_by(SalaryRecord.created_at)
-        .all()
-    )
-
+    records = get_owned_records_by_created_at(db, current_user.id)
     return build_group_summary(records, "employee_name", lambda r: r.employee_name or "(미지정)")
 
 
