@@ -8,6 +8,13 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/setupTests.js',
     globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      // main.jsx는 React 루트를 마운트하기만 하는 진입점이라 단위 테스트로 의미 있게
+      // 검증할 로직이 없어 측정 대상에서 제외한다.
+      exclude: ['src/main.jsx'],
+    },
   },
   build: {
     // antd 하나만으로도 tree-shaking 후 ~1MB라, 이 값은 "실수로 전부 한 덩어리가 됐는지"를

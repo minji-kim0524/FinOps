@@ -34,7 +34,7 @@
 - React (Vite)
 - Ant Design (UI 컴포넌트), Recharts (차트)
 - axios
-- Vitest + React Testing Library (단위 테스트), Playwright (E2E), oxlint (린트)
+- Vitest + React Testing Library (단위 테스트 및 커버리지 측정), Playwright (E2E), oxlint (린트)
 
 ### Infra
 - Docker, docker-compose (백엔드+프론트엔드+PostgreSQL 로컬 통합 실행)
@@ -146,6 +146,13 @@ python -m pytest --cov --cov-report=term-missing   # 터미널에 라인별 미�
 python -m pytest --cov --cov-report=html            # htmlcov/index.html로 상세 리포트 확인
 ```
 CI에서도 매 실행마다 커버리지를 측정해 `coverage-report` 아티팩트(HTML)로 남깁니다.
+
+프론트엔드 테스트 커버리지는 Vitest의 v8 프로바이더로 측정합니다. 컴포넌트/훅 단위 테스트가 아직 많지 않아 수치 자체는 낮게 나오는데(대부분은 E2E가 실제 상호작용을 검증), 유틸리티 함수처럼 순수 로직인 부분부터 우선 커버하고 있습니다.
+```bash
+cd frontend
+npm run test:coverage   # 터미널 요약 출력 + coverage/index.html로 상세 리포트 확인
+```
+CI에서도 매 실행마다 측정해 `frontend-coverage-report` 아티팩트(HTML)로 남깁니다.
 
 ### DB 백업/복원
 

@@ -42,7 +42,12 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci
-      - run: npm run test
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/
+          retention-days: 7
       - run: npm run build
 
   e2e-tests:
