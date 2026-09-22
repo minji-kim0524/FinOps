@@ -147,7 +147,7 @@ python -m pytest --cov --cov-report=html            # htmlcov/index.html로 상�
 ```
 CI에서도 매 실행마다 커버리지를 측정해 `coverage-report` 아티팩트(HTML)로 남깁니다.
 
-프론트엔드 테스트 커버리지는 Vitest의 v8 프로바이더로 측정합니다. 컴포넌트/훅 단위 테스트가 아직 많지 않아 수치 자체는 낮게 나오는데(대부분은 E2E가 실제 상호작용을 검증), 유틸리티 함수처럼 순수 로직인 부분부터 우선 커버하고 있습니다.
+프론트엔드 테스트 커버리지는 Vitest의 v8 프로바이더로 측정합니다. 순수 로직(유틸리티 함수, `useRecordFilters`/`useRecordExports` 등 데이터 훅)은 단위 테스트로 두텁게 검증하고 있는 반면, 화면을 직접 렌더링해야 하는 프레젠테이션 컴포넌트(`App.jsx`, 표/차트/모달 등)는 상호작용까지 실제로 확인하는 Playwright E2E 쪽이 검증을 주로 담당해 단위 테스트 커버리지 수치만으로는 낮게 보일 수 있습니다.
 ```bash
 cd frontend
 npm run test:coverage   # 터미널 요약 출력 + coverage/index.html로 상세 리포트 확인
