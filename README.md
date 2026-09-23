@@ -100,6 +100,8 @@ uvicorn app.main:app --reload --port 8000
 ```
 DB는 별도 설정이 없으면 SQLite(`finops.db`)를 사용합니다. 테이블은 더 이상 앱 실행 시 자동 생성되지 않으므로, 최초 실행 전(그리고 이후 스키마가 바뀔 때마다) `alembic upgrade head`를 실행해야 합니다.
 
+`DATABASE_URL`/`JWT_SECRET_KEY`/`CORS_ORIGINS`는 모두 선택 사항이라 비워두면 로컬 개발에 알맞은 기본값(SQLite, 개발용 비밀키, `http://localhost:5173` CORS 허용)을 그대로 씁니다. 값을 바꾸고 싶다면 `backend/.env.example`을 `backend/.env`로 복사해 필요한 항목만 주석을 풀고 채우세요(`.env`는 git에 커밋되지 않습니다).
+
 `requirements-dev.txt`는 배포 이미지에는 포함되지 않는 pytest/httpx(테스트 전용)까지 포함한 로컬 개발용 목록입니다. 배포용 `requirements.txt`만 필요하다면 `pip install -r requirements.txt`를 사용하세요.
 
 모델(`app/models.py`)을 수정했다면 새 마이그레이션을 생성해야 합니다.
@@ -116,7 +118,7 @@ cd frontend
 npm install
 npm run dev
 ```
-`http://localhost:5173`에서 확인할 수 있습니다.
+`http://localhost:5173`에서 확인할 수 있습니다. 백엔드 주소가 `http://localhost:8000`이 아니라면 `frontend/.env.example`을 `frontend/.env`로 복사해 `VITE_API_BASE_URL`을 설정하세요.
 
 ### Docker Compose로 한 번에 실행
 

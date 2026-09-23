@@ -3,12 +3,15 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
+
+load_dotenv()
 
 # 개발용 기본값입니다. 실제 배포 시에는 반드시 별도의 안전한 값으로 교체해야 합니다.
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")

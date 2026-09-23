@@ -1,5 +1,6 @@
 import os
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,6 +8,8 @@ from slowapi.errors import RateLimitExceeded
 
 from app.rate_limit import limiter
 from app.routers import auth, records
+
+load_dotenv()
 
 # DB 스키마는 alembic 마이그레이션으로 관리한다 (schema는 더 이상 create_all로 자동 생성하지 않음).
 # 로컬/Docker/Render 모두 애플리케이션 시작 전 `alembic upgrade head`를 실행해야 한다.
