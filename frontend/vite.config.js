@@ -17,9 +17,9 @@ export default defineConfig({
     },
   },
   build: {
-    // antd 하나만으로도 tree-shaking 후 ~1MB라, 이 값은 "실수로 전부 한 덩어리가 됐는지"를
-    // 감지하기 위한 임계값입니다. vendor-antd 청크의 정상 크기를 반영해 올려둠.
-    chunkSizeWarningLimit: 1100,
+    // 로그인 화면이 정말로 필요로 하는 antd 공용 런타임(preload-helper 청크)이 약 515KB라,
+    // 이 값은 "실수로 또 다른 덩어리가 생겼는지"를 감지하기 위한 임계값입니다.
+    chunkSizeWarningLimit: 520,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -27,12 +27,11 @@ export default defineConfig({
           if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
             return 'vendor-react'
           }
-          if (id.includes('antd') || id.includes('@ant-design') || id.includes('rc-')) {
-            return 'vendor-antd'
-          }
-          if (id.includes('recharts') || id.includes('d3-')) {
-            return 'vendor-recharts'
-          }
+          // recharts/antd/@ant-design/rc-*는 일부러 강제 청크로 묶지 않는다. 로그인 화면과 로그인
+          // 이후 화면(AppContent, React.lazy로 지연 로딩)이 이 라이브러리를 함께 쓰는데,
+          // 여기서 하나로 몰아넣으면 AppContent 전용 컴포넌트(Table/DatePicker/Upload 등)
+          // 까지 로그인 화면의 초기 로딩에 끼어 들어가 지연 로딩 효과가 사라진다. Rollup의
+          // 자동 분할에 맡겨 정적/동적 import 경계를 따라 자연스럽게 나뉘도록 둔다.
         },
       },
     },
