@@ -111,3 +111,52 @@ def test_employee_summary_groups_by_employee_name(client):
 
     assert data["(미지정)"]["count"] == 1
     assert data["(미지정)"]["total_net_pay"] == 2_636_093
+
+
+def test_summaries_only_include_own_records(client):
+    # 집계는 DB의 GROUP BY로 계산하므로, 소유자 필터가 빠지면 다른 사용자의 합계가 섞여 들어온다.
+    client.post("/calculate", json={"employee_name": "홍길동", "gross_pay": 3_000_000, "num_dependents": 1})
+
+    client.post(
+        "/auth/register",
+        json={
+            "username": "summary_other",
+            "password": "otherpass123",
+            "security_question": "질문",
+            "security_answer": "답변",
+        },
+    )
+    other_token = client.post(
+        "/auth/login", json={"username": "summary_other", "password": "otherpass123"}
+    ).json()["access_token"]
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+    client.post(
+        "/calculate",
+        json={"employee_name": "타인", "gross_pay": 9_000_000, "num_dependents": 1},
+        headers=other_headers,
+    )
+
+    mine_month = client.get("/records/summary").json()
+    mine_year = client.get("/records/summary/yearly").json()
+    mine_employee = client.get("/records/summary/by-employee").json()
+
+    assert sum(row["count"] for row in mine_month) == 1
+    assert sum(row["count"] for row in mine_year) == 1
+    assert [row["employee_name"] for row in mine_employee] == ["홍길동"]
+
+    others_employee = client.get("/records/summary/by-employee", headers=other_headers).json()
+    assert [row["employee_name"] for row in others_employee] == ["타인"]
+
+
+def test_summary_average_is_rounded_to_integer(client):
+    # DB의 AVG는 소수로 나오므로, 응답은 정수로 반올림한 값이어야 한다.
+    # (2,636,093 + 4,160,779 + 4,160,779) / 3 = 3,652,550.333... → 3,652,550
+    client.post("/calculate", json={"employee_name": "동일", "gross_pay": 3_000_000, "num_dependents": 1})
+    client.post("/calculate", json={"employee_name": "동일", "gross_pay": 5_000_000, "num_dependents": 1})
+    client.post("/calculate", json={"employee_name": "동일", "gross_pay": 5_000_000, "num_dependents": 1})
+
+    row = {r["employee_name"]: r for r in client.get("/records/summary/by-employee").json()}["동일"]
+
+    assert row["count"] == 3
+    assert row["avg_net_pay"] == 3_652_550
+    assert isinstance(row["avg_net_pay"], int)

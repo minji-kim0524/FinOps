@@ -10,6 +10,7 @@ from typing import Optional
 
 import pandas as pd
 from fastapi import HTTPException
+from sqlalchemy import extract, func
 from sqlalchemy.orm import Query as SAQuery
 from sqlalchemy.orm import Session
 
@@ -205,46 +206,60 @@ def get_owned_record_or_404(record_id: int, owner_id: int, db: Session) -> Salar
     return record
 
 
-def get_owned_records_by_created_at(db: Session, owner_id: int) -> list[SalaryRecord]:
-    """월별/연도별/직원별 집계(/records/summary*)가 공유하는 조회: 소유자의 전체 이력을 계산일시 순으로."""
+UNASSIGNED_EMPLOYEE_LABEL = "(미지정)"
+
+
+def _aggregate_by(db: Session, owner_id: int, *group_exprs) -> list:
+    """소유자의 이력을 group_exprs 기준으로 묶어 건수/합계/평균을 DB에서 직접 집계한다.
+
+    각 행은 (그룹 키들..., 건수, 세전 총 지급액 합, 공제액 합, 실수령액 합, 실수령액 평균) 순서다.
+    "세전 급여"는 집계상 상여금/성과급을 포함한 실제 세전 총 지급액을 의미한다.
+    """
     return (
-        db.query(SalaryRecord)
+        db.query(
+            *group_exprs,
+            func.count(SalaryRecord.id),
+            func.sum(SalaryRecord.gross_pay + SalaryRecord.bonus_pay),
+            func.sum(SalaryRecord.total_deduction),
+            func.sum(SalaryRecord.net_pay),
+            func.avg(SalaryRecord.net_pay),
+        )
         .filter(SalaryRecord.owner_id == owner_id)
-        .order_by(SalaryRecord.created_at)
+        .group_by(*group_exprs)
         .all()
     )
 
 
-def build_group_summary(records: list[SalaryRecord], group_key: str, group_value) -> list[dict]:
-    """records를 group_value(record) 기준으로 묶어 건수/합계/평균을 집계한다."""
-    if not records:
-        return []
+def _summary_dict(group_key: str, group_value: str, aggregates: tuple) -> dict:
+    count, total_gross_pay, total_deduction, total_net_pay, avg_net_pay = aggregates
+    return {
+        group_key: group_value,
+        "count": int(count),
+        "total_gross_pay": int(total_gross_pay),
+        "total_deduction": int(total_deduction),
+        "total_net_pay": int(total_net_pay),
+        "avg_net_pay": round(float(avg_net_pay)),
+    }
 
-    df = pd.DataFrame(
-        [
-            {
-                group_key: group_value(record),
-                # 집계상 "세전 급여"는 상여금/성과급을 포함한 실제 세전 총 지급액을 의미한다.
-                "gross_pay": record.gross_pay + record.bonus_pay,
-                "total_deduction": record.total_deduction,
-                "net_pay": record.net_pay,
-            }
-            for record in records
-        ]
-    )
 
-    summary = (
-        df.groupby(group_key)
-        .agg(
-            count=("net_pay", "size"),
-            total_gross_pay=("gross_pay", "sum"),
-            total_deduction=("total_deduction", "sum"),
-            total_net_pay=("net_pay", "sum"),
-            avg_net_pay=("net_pay", "mean"),
-        )
-        .reset_index()
-        .sort_values(group_key)
-    )
-    summary["avg_net_pay"] = summary["avg_net_pay"].round().astype(int)
+def summarize_by_month(db: Session, owner_id: int) -> list[dict]:
+    # 월/연도 추출은 SQLite(로컬/테스트)와 PostgreSQL(배포) 모두에서 같은 결과를 내는 EXTRACT를 쓴다.
+    year = extract("year", SalaryRecord.created_at)
+    month = extract("month", SalaryRecord.created_at)
+    rows = _aggregate_by(db, owner_id, year, month)
+    summaries = [_summary_dict("month", f"{int(y):04d}-{int(m):02d}", agg) for y, m, *agg in rows]
+    return sorted(summaries, key=lambda summary: summary["month"])
 
-    return summary.to_dict("records")
+
+def summarize_by_year(db: Session, owner_id: int) -> list[dict]:
+    year = extract("year", SalaryRecord.created_at)
+    rows = _aggregate_by(db, owner_id, year)
+    summaries = [_summary_dict("year", f"{int(y):04d}", agg) for y, *agg in rows]
+    return sorted(summaries, key=lambda summary: summary["year"])
+
+
+def summarize_by_employee(db: Session, owner_id: int) -> list[dict]:
+    employee_label = func.coalesce(func.nullif(SalaryRecord.employee_name, ""), UNASSIGNED_EMPLOYEE_LABEL)
+    rows = _aggregate_by(db, owner_id, employee_label)
+    summaries = [_summary_dict("employee_name", name, agg) for name, *agg in rows]
+    return sorted(summaries, key=lambda summary: summary["employee_name"])

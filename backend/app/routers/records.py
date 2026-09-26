@@ -19,12 +19,13 @@ from app.services.records import (
     apply_calculated_fields,
     apply_record_filters,
     apply_record_sort,
-    build_group_summary,
     get_owned_record_or_404,
-    get_owned_records_by_created_at,
     parse_bulk_upload_csv,
     save_calculated_records,
     serialize_record,
+    summarize_by_employee,
+    summarize_by_month,
+    summarize_by_year,
 )
 
 router = APIRouter(tags=["records"])
@@ -163,20 +164,17 @@ def download_payslips_zip(
 
 @router.get("/records/summary")
 def monthly_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = get_owned_records_by_created_at(db, current_user.id)
-    return build_group_summary(records, "month", lambda r: r.created_at.strftime("%Y-%m"))
+    return summarize_by_month(db, current_user.id)
 
 
 @router.get("/records/summary/yearly")
 def yearly_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = get_owned_records_by_created_at(db, current_user.id)
-    return build_group_summary(records, "year", lambda r: r.created_at.strftime("%Y"))
+    return summarize_by_year(db, current_user.id)
 
 
 @router.get("/records/summary/by-employee")
 def employee_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    records = get_owned_records_by_created_at(db, current_user.id)
-    return build_group_summary(records, "employee_name", lambda r: r.employee_name or "(미지정)")
+    return summarize_by_employee(db, current_user.id)
 
 
 @router.get("/records/{record_id}/payslip")
