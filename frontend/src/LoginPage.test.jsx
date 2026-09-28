@@ -172,4 +172,33 @@ describe("LoginPage", () => {
       });
     });
   });
+
+  it("비밀번호 재설정이 계정 잠금(423)으로 실패하면 백엔드가 알려준 대기 안내를 보여준다", async () => {
+    api.post.mockResolvedValueOnce({ data: { security_question: "가장 좋아하는 음식은?" } });
+    api.post.mockRejectedValueOnce({
+      response: {
+        status: 423,
+        data: { detail: "로그인 실패 횟수를 초과해 계정이 잠겼습니다. 15분 후 다시 시도해주세요." },
+      },
+    });
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.click(screen.getByText("비밀번호를 잊으셨나요?"));
+    const dialog = screen.getByRole("dialog", { name: "비밀번호 재설정" });
+    await user.type(within(dialog).getByLabelText("아이디"), "tester");
+    await user.click(within(dialog).getByRole("button", { name: "다음" }));
+    await screen.findByDisplayValue("가장 좋아하는 음식은?");
+
+    await user.type(within(dialog).getByLabelText("보안 답변"), "김치찌개");
+    await user.type(within(dialog).getByLabelText("새 비밀번호"), "newpass123");
+    await user.type(within(dialog).getByLabelText("새 비밀번호 확인"), "newpass123");
+    await user.click(within(dialog).getByRole("button", { name: "비밀번호 재설정" }));
+
+    expect(
+      await screen.findByText("로그인 실패 횟수를 초과해 계정이 잠겼습니다. 15분 후 다시 시도해주세요.")
+    ).toBeInTheDocument();
+    // 잠겨서 실패했으므로 모달은 닫히지 않고 그대로 열려 있어야 한다.
+    expect(screen.getByRole("dialog", { name: "비밀번호 재설정" })).toBeInTheDocument();
+  });
 });

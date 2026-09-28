@@ -267,3 +267,87 @@ def test_password_reset_weak_new_password(client):
     )
 
     assert response.status_code == 422
+
+
+def test_password_reset_locks_account_after_max_failed_attempts(client):
+    # 로그인과 마찬가지로, 요청 속도 제한 창 안에서는 5번째 실패 직후 요청이 slowapi의
+    # 분당 5회 제한(429)에 먼저 걸리므로, 계정 잠금(423)을 확인하려면 리셋해야 한다.
+    limiter.reset()
+
+    for _ in range(5):
+        response = client.post(
+            "/auth/password-reset",
+            json={"username": TEST_USERNAME, "security_answer": "wrong answer", "new_password": "brandnew123"},
+        )
+        assert response.status_code == 400
+
+    limiter.reset()
+
+    # 이제는 올바른 보안 답변을 넣어도 잠금 때문에 재설정할 수 없어야 한다.
+    response = client.post(
+        "/auth/password-reset",
+        json={
+            "username": TEST_USERNAME,
+            "security_answer": TEST_SECURITY_ANSWER,
+            "new_password": "brandnew123",
+        },
+    )
+
+    assert response.status_code == 423
+    assert "계정이 잠겼습니다" in response.json()["detail"]
+
+    # 로그인 자체도 같은 잠금에 걸려야 한다(계정 잠금은 로그인/재설정이 카운터를 공유).
+    limiter.reset()
+    login_response = client.post(
+        "/auth/login", json={"username": TEST_USERNAME, "password": TEST_PASSWORD}
+    )
+    assert login_response.status_code == 423
+
+
+def test_login_and_password_reset_failures_share_the_same_lockout_counter(client):
+    limiter.reset()
+
+    for _ in range(3):
+        client.post("/auth/login", json={"username": TEST_USERNAME, "password": "wrongpass"})
+    for _ in range(2):
+        client.post(
+            "/auth/password-reset",
+            json={"username": TEST_USERNAME, "security_answer": "wrong answer", "new_password": "brandnew123"},
+        )
+
+    limiter.reset()
+    response = client.post(
+        "/auth/password-reset",
+        json={
+            "username": TEST_USERNAME,
+            "security_answer": TEST_SECURITY_ANSWER,
+            "new_password": "brandnew123",
+        },
+    )
+
+    assert response.status_code == 423
+
+
+def test_password_reset_success_resets_failed_attempt_count(client):
+    limiter.reset()
+
+    for _ in range(4):
+        client.post(
+            "/auth/password-reset",
+            json={"username": TEST_USERNAME, "security_answer": "wrong answer", "new_password": "brandnew123"},
+        )
+    success = client.post(
+        "/auth/password-reset",
+        json={
+            "username": TEST_USERNAME,
+            "security_answer": TEST_SECURITY_ANSWER,
+            "new_password": "brandnew123",
+        },
+    )
+    assert success.status_code == 200
+
+    db = TestingSessionLocal()
+    user = db.query(User).filter(User.username == TEST_USERNAME).first()
+    assert user.failed_login_attempts == 0
+    assert user.locked_until is None
+    db.close()

@@ -81,9 +81,22 @@ def get_security_question(request: Request, input: SecurityQuestionInput, db: Se
 @limiter.limit("5/minute")
 def reset_password(request: Request, input: PasswordResetInput, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == input.username).first()
+
+    # 계정 잠금은 로그인과 보안 답변 시도를 함께 센다. IP 기준 요청 속도 제한(slowapi)과
+    # 달리 "계정" 기준이라, 비밀번호 대신 보안 답변을 노려 여러 IP에서 천천히 시도하는
+    # 무차별 대입도 막는다.
+    if user is not None and is_account_locked(user):
+        raise HTTPException(
+            status_code=423,
+            detail=f"로그인 실패 횟수를 초과해 계정이 잠겼습니다. {LOCKOUT_MINUTES}분 후 다시 시도해주세요.",
+        )
+
     if user is None or not verify_security_answer(input.security_answer, user.security_answer_hash):
+        if user is not None:
+            register_failed_login(user, db)
         raise HTTPException(status_code=400, detail="아이디 또는 보안 답변이 올바르지 않습니다")
 
+    reset_login_attempts(user, db)
     user.hashed_password = hash_password(input.new_password)
     db.commit()
 
