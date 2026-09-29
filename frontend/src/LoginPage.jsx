@@ -141,65 +141,68 @@ function LoginPage({ onLogin }) {
 
   return (
     <div className="login-page">
-      <Card title="급여 실수령액 계산기" style={{ width: 360 }}>
-        <Segmented
-          block
-          options={[
-            { label: "로그인", value: "login" },
-            { label: "회원가입", value: "register" },
-          ]}
-          value={mode}
-          onChange={setMode}
-          style={{ marginBottom: 16 }}
-        />
-        <Form name="auth-form" layout="vertical" onFinish={handleFinish}>
-          <Form.Item
-            name="username"
-            label="아이디"
-            extra={mode === "register" ? "예: minji123" : undefined}
-            rules={[{ required: true, message: "아이디를 입력하세요" }]}
-          >
-            <Input autoComplete="username" placeholder="예: minji123" />
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label="비밀번호"
-            extra={mode === "register" ? "최소 8자, 영문자와 숫자를 포함해야 합니다" : undefined}
-            rules={mode === "register" ? REGISTER_PASSWORD_RULES : LOGIN_PASSWORD_RULES}
-          >
-            <Input.Password autoComplete={mode === "register" ? "new-password" : "current-password"} />
-          </Form.Item>
-          {mode === "register" && (
-            <>
-              <Form.Item
-                name="security_question"
-                label="보안 질문"
-                extra="비밀번호를 잊었을 때 본인 확인에 사용됩니다"
-                rules={[{ required: true, message: "보안 질문을 선택하세요" }]}
-              >
-                <Select options={SECURITY_QUESTIONS.map((q) => ({ label: q, value: q }))} />
-              </Form.Item>
-              <Form.Item
-                name="security_answer"
-                label="보안 답변"
-                rules={[{ required: true, message: "보안 답변을 입력하세요" }]}
-              >
-                <Input />
-              </Form.Item>
-            </>
-          )}
-          <Form.Item>
-            <Button type="primary" htmlType="submit" block loading={submitting}>
-              {mode === "login" ? "로그인" : "회원가입"}
+      <div className="login-page-content">
+        <h1>급여 실수령액 계산기</h1>
+        <Card style={{ width: 360 }}>
+          <Segmented
+            block
+            options={[
+              { label: "로그인", value: "login" },
+              { label: "회원가입", value: "register" },
+            ]}
+            value={mode}
+            onChange={setMode}
+            style={{ marginBottom: 16 }}
+          />
+          <Form name="auth-form" layout="vertical" onFinish={handleFinish}>
+            <Form.Item
+              name="username"
+              label="아이디"
+              extra={mode === "register" ? "예: minji123" : undefined}
+              rules={[{ required: true, message: "아이디를 입력하세요" }]}
+            >
+              <Input autoComplete="username" placeholder="예: minji123" />
+            </Form.Item>
+            <Form.Item
+              name="password"
+              label="비밀번호"
+              extra={mode === "register" ? "최소 8자, 영문자와 숫자를 포함해야 합니다" : undefined}
+              rules={mode === "register" ? REGISTER_PASSWORD_RULES : LOGIN_PASSWORD_RULES}
+            >
+              <Input.Password autoComplete={mode === "register" ? "new-password" : "current-password"} />
+            </Form.Item>
+            {mode === "register" && (
+              <>
+                <Form.Item
+                  name="security_question"
+                  label="보안 질문"
+                  extra="비밀번호를 잊었을 때 본인 확인에 사용됩니다"
+                  rules={[{ required: true, message: "보안 질문을 선택하세요" }]}
+                >
+                  <Select options={SECURITY_QUESTIONS.map((q) => ({ label: q, value: q }))} />
+                </Form.Item>
+                <Form.Item
+                  name="security_answer"
+                  label="보안 답변"
+                  rules={[{ required: true, message: "보안 답변을 입력하세요" }]}
+                >
+                  <Input />
+                </Form.Item>
+              </>
+            )}
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block loading={submitting}>
+                {mode === "login" ? "로그인" : "회원가입"}
+              </Button>
+            </Form.Item>
+          </Form>
+          {mode === "login" && (
+            <Button type="link" style={{ padding: 0 }} onClick={() => setResetOpen(true)}>
+              비밀번호를 잊으셨나요?
             </Button>
-          </Form.Item>
-        </Form>
-        {mode === "login" && (
-          <Button type="link" style={{ padding: 0 }} onClick={() => setResetOpen(true)}>
-            비밀번호를 잊으셨나요?
-          </Button>
-        )}
-      </Card>
+          )}
+        </Card>
+      </div>
 
       <Modal
         title="비밀번호 재설정"
