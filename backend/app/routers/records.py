@@ -30,6 +30,11 @@ from app.services.records import (
 
 router = APIRouter(tags=["records"])
 
+# 명세서 1건당 PDF 생성에 약 3~4ms가 걸리고(실측), 건수가 많아질수록 응답 시간과 ZIP 용량이
+# 선형으로 늘어난다(1,000건 기준 약 4초·27MB). 필터 없이 대량 다운로드를 요청해 응답이 느려지거나
+# 서버 메모리를 과도하게 쓰는 것을 막기 위해 상한을 둔다.
+MAX_PAYSLIP_ZIP_RECORDS = 1000
+
 
 @router.post("/calculate")
 def calculate(
@@ -147,6 +152,17 @@ def download_payslips_zip(
     """
     query = db.query(SalaryRecord).filter(SalaryRecord.owner_id == current_user.id)
     query = apply_record_filters(query, filters)
+
+    total = query.count()
+    if total > MAX_PAYSLIP_ZIP_RECORDS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"한 번에 내려받을 수 있는 급여명세서는 최대 {MAX_PAYSLIP_ZIP_RECORDS}건입니다"
+                f"(현재 {total}건). 직원·기간 등 필터로 범위를 좁혀주세요."
+            ),
+        )
+
     records = query.order_by(SalaryRecord.id).all()
 
     buffer = io.BytesIO()

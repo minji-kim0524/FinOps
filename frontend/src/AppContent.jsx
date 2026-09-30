@@ -142,6 +142,7 @@ function AppContent({ onLogout }) {
         onDownloadTemplate={salary.downloadCsvTemplate}
         downloadingPayslips={salary.downloadingPayslips}
         onDownloadPayslipsZip={salary.downloadPayslipsZip}
+        filteredRecordCount={salary.totalRecords}
       />
 
       <RecordFilters

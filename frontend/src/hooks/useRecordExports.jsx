@@ -3,6 +3,17 @@ import api from "../api";
 import { downloadBlob } from "../utils/download";
 import { useErrorReporter } from "./useErrorReporter";
 
+// responseType: "blob"으로 요청하면 에러 응답의 JSON 본문도 axios가 Blob으로 돌려준다.
+// err.response.data.detail로 바로 못 읽으므로, blob을 텍스트로 읽어 직접 파싱해야 한다.
+async function readBlobErrorDetail(data) {
+  if (!(data instanceof Blob)) return undefined;
+  try {
+    return JSON.parse(await data.text()).detail;
+  } catch {
+    return undefined;
+  }
+}
+
 // 이력 관련 파일 다운로드(엑셀/ZIP/CSV 템플릿/개별 명세서)와 CSV 일괄 업로드를 모은 훅.
 // buildFilterParams/refreshAll은 useSalaryRecords가 관리하는 필터·목록 상태와 맞물려야 해서 인자로 받는다.
 export function useRecordExports({ message, modal, onLogout, buildFilterParams, refreshAll }) {
@@ -78,7 +89,11 @@ export function useRecordExports({ message, modal, onLogout, buildFilterParams, 
       });
       downloadBlob(response.data, "salary_payslips.zip");
     } catch (err) {
-      reportError(err, "급여명세서 일괄 다운로드에 실패했습니다.");
+      if (err.response?.status === 400) {
+        message.error((await readBlobErrorDetail(err.response.data)) || "요청한 범위가 너무 넓습니다. 필터로 범위를 좁혀주세요.");
+      } else {
+        reportError(err, "급여명세서 일괄 다운로드에 실패했습니다.");
+      }
     } finally {
       setDownloadingPayslips(false);
     }

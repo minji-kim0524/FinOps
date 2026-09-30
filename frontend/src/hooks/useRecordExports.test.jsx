@@ -110,7 +110,33 @@ describe("useRecordExports", () => {
     expect(downloadBlob).toHaveBeenCalledWith(blobData, "payslip_42.pdf");
   });
 
-  it("downloadPayslipsZip이 실패하면 로딩 상태를 해제하고 실패 메시지를 보여준다", async () => {
+  it("downloadPayslipsZip이 건수 제한(400)으로 실패하면 blob으로 온 에러 본문을 읽어 안내한다", async () => {
+    // responseType: "blob"이면 에러 응답의 JSON 본문도 axios가 Blob으로 돌려준다.
+    const errorBlob = new Blob([JSON.stringify({ detail: "한 번에 내려받을 수 있는 급여명세서는 최대 1000건입니다." })]);
+    api.get.mockRejectedValueOnce({ response: { status: 400, data: errorBlob } });
+    const { result, message } = setup();
+
+    await act(async () => {
+      await result.current.downloadPayslipsZip();
+    });
+
+    expect(message.error).toHaveBeenCalledWith("한 번에 내려받을 수 있는 급여명세서는 최대 1000건입니다.");
+    expect(result.current.downloadingPayslips).toBe(false);
+  });
+
+  it("downloadPayslipsZip의 400 에러 본문을 읽을 수 없으면 기본 안내 문구를 보여준다", async () => {
+    const unparseableBlob = new Blob(["이건 JSON이 아님"]);
+    api.get.mockRejectedValueOnce({ response: { status: 400, data: unparseableBlob } });
+    const { result, message } = setup();
+
+    await act(async () => {
+      await result.current.downloadPayslipsZip();
+    });
+
+    expect(message.error).toHaveBeenCalledWith("요청한 범위가 너무 넓습니다. 필터로 범위를 좁혀주세요.");
+  });
+
+  it("downloadPayslipsZip이 400 외의 이유로 실패하면 로딩 상태를 해제하고 실패 메시지를 보여준다", async () => {
     api.get.mockRejectedValueOnce({ response: { status: 500 } });
     const { result, message } = setup();
 
