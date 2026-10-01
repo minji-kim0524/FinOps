@@ -3,6 +3,17 @@ from datetime import datetime
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routers.records import MAX_BULK_UPLOAD_CSV_BYTES
+
+
+def _csv_padded_to_size(size: int) -> bytes:
+    # employee_name은 그대로 문자열로 저장되는 자유 입력 컬럼이라, 이 필드를 채워 전체
+    # 바이트 수를 원하는 크기에 정확히 맞출 수 있다(CSV 구조는 그대로 유효하게 유지됨).
+    header = b"employee_name,gross_pay,bonus_pay,num_dependents,num_children_8_to_20\n"
+    tail = b",3000000,0,1,0\n"
+    padding = size - len(header) - len(tail)
+    assert padding > 0
+    return header + b"a" * padding + tail
 
 
 def test_health_check():
@@ -200,6 +211,34 @@ def test_calculate_bulk_endpoint_skips_invalid_rows_and_reports_them(client):
     saved = client.get("/records").json()
     assert saved["total"] == 1
     assert len(saved["items"]) == 1
+
+
+def test_calculate_bulk_endpoint_allows_exactly_the_size_limit(client):
+    csv_content = _csv_padded_to_size(MAX_BULK_UPLOAD_CSV_BYTES)
+    assert len(csv_content) == MAX_BULK_UPLOAD_CSV_BYTES
+
+    response = client.post(
+        "/calculate/bulk",
+        files={"file": ("salaries.csv", csv_content, "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert len(response.json()["created"]) == 1
+
+
+def test_calculate_bulk_endpoint_rejects_when_over_the_size_limit(client):
+    csv_content = _csv_padded_to_size(MAX_BULK_UPLOAD_CSV_BYTES + 1)
+    assert len(csv_content) == MAX_BULK_UPLOAD_CSV_BYTES + 1
+
+    response = client.post(
+        "/calculate/bulk",
+        files={"file": ("salaries.csv", csv_content, "text/csv")},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "너무 큽니다" in detail
+    assert "1MB" in detail
 
 
 def test_update_record_recalculates_values(client):

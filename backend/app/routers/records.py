@@ -35,6 +35,13 @@ router = APIRouter(tags=["records"])
 # 서버 메모리를 과도하게 쓰는 것을 막기 위해 상한을 둔다.
 MAX_PAYSLIP_ZIP_RECORDS = 1000
 
+# 실측(로컬 SQLite 기준) 결과 CSV 파싱 자체는 가볍지만(100,000행도 0.03초), 행별로 레코드를
+# 만들어 DB에 저장하는 과정이 시간을 지배한다(10,000행 약 1.5초, 50,000행 약 8초, 100,000행
+# 약 20초). 업로드 파일을 전부 메모리로 읽어들이기 전에 크기만 먼저 확인해 거르면, 지나치게
+# 큰 파일이 응답을 오래 묶어두거나 메모리를 과도하게 쓰는 것을 막을 수 있다. 샘플 CSV 기준
+# 행당 약 30바이트라 1MB면 약 3만 행까지 허용되며, 이는 로컬 기준 수 초 내에 끝나는 수준이다.
+MAX_BULK_UPLOAD_CSV_BYTES = 1 * 1024 * 1024
+
 
 @router.post("/calculate")
 def calculate(
@@ -51,6 +58,17 @@ async def calculate_bulk(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # file.size는 멀티파트 파싱 과정에서 이미 채워져 있으므로, 전체를 메모리로 읽기 전에
+    # 크기부터 확인해 너무 큰 파일은 미리 거른다.
+    if file.size and file.size > MAX_BULK_UPLOAD_CSV_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"CSV 파일이 너무 큽니다(현재 {file.size / 1024 / 1024:.1f}MB, 최대 "
+                f"{MAX_BULK_UPLOAD_CSV_BYTES / 1024 / 1024:.0f}MB). 파일을 나눠서 업로드해주세요."
+            ),
+        )
+
     content = await file.read()
     try:
         df = pd.read_csv(io.BytesIO(content))

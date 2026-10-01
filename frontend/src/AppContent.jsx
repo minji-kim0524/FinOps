@@ -143,6 +143,7 @@ function AppContent({ onLogout }) {
         downloadingPayslips={salary.downloadingPayslips}
         onDownloadPayslipsZip={salary.downloadPayslipsZip}
         filteredRecordCount={salary.totalRecords}
+        message={message}
       />
 
       <RecordFilters
