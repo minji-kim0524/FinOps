@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.limits import BCRYPT_MAX_BYTES
 from app.models import User
 
 load_dotenv()
@@ -31,7 +32,12 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(password.encode(), hashed_password.encode())
+    password_bytes = password.encode()
+    # bcrypt 5부터는 72바이트를 넘는 입력을 예외로 거부한다. 가입 때 같은 한도로 막으므로
+    # 이보다 긴 입력은 맞을 수 없는 비밀번호이고, 500 오류가 아니라 "불일치"로 처리해야 한다.
+    if len(password_bytes) > BCRYPT_MAX_BYTES:
+        return False
+    return bcrypt.checkpw(password_bytes, hashed_password.encode())
 
 
 def _normalize_security_answer(answer: str) -> str:
@@ -43,7 +49,10 @@ def hash_security_answer(answer: str) -> str:
 
 
 def verify_security_answer(answer: str, hashed_answer: str) -> bool:
-    return bcrypt.checkpw(_normalize_security_answer(answer).encode(), hashed_answer.encode())
+    answer_bytes = _normalize_security_answer(answer).encode()
+    if len(answer_bytes) > BCRYPT_MAX_BYTES:
+        return False
+    return bcrypt.checkpw(answer_bytes, hashed_answer.encode())
 
 
 def is_account_locked(user: User) -> bool:

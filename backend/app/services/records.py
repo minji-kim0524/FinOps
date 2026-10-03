@@ -15,6 +15,14 @@ from sqlalchemy.orm import Query as SAQuery
 from sqlalchemy.orm import Session
 
 from app.calculator import calculate_net_pay
+from app.limits import (
+    CONTROL_CHARS_RE,
+    EMPLOYEE_NAME_MAX_LENGTH,
+    MAX_CHILDREN_8_TO_20,
+    MAX_DEPENDENTS,
+    MAX_PAY_AMOUNT,
+    SEARCH_TEXT_MAX_LENGTH,
+)
 from app.models import SalaryRecord
 
 EXPORT_COLUMN_LABELS = {
@@ -47,16 +55,54 @@ class RecordFilterParams:
     max_gross_pay: Optional[int] = None
 
 
+def _escape_like(text: str) -> str:
+    """LIKE 패턴에서 특별한 의미를 갖는 \\, %, _ 를 글자 그대로 검색하도록 이스케이프한다.
+
+    이스케이프하지 않으면 검색어 "_"나 "%"가 모든 행에 매칭돼 필터가 무력화된다.
+    (SQL 인젝션은 아니다. 값은 항상 바인딩 파라미터로 전달된다)
+    """
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _parse_iso_datetime(value: str, field: str) -> datetime:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{field}은(는) YYYY-MM-DD 또는 YYYY-MM-DDTHH:MM:SS 형식이어야 합니다.",
+        )
+
+
+def _check_text_length(value: Optional[str], field: str) -> None:
+    if value is not None and len(value) > SEARCH_TEXT_MAX_LENGTH:
+        raise HTTPException(
+            status_code=422, detail=f"{field}은(는) 최대 {SEARCH_TEXT_MAX_LENGTH}자까지 입력할 수 있습니다."
+        )
+
+
+def _check_amount_range(value: Optional[int], field: str) -> None:
+    if value is not None and not 0 <= value <= MAX_PAY_AMOUNT:
+        raise HTTPException(status_code=422, detail=f"{field}은(는) 0~{MAX_PAY_AMOUNT:,} 범위여야 합니다.")
+
+
 def apply_record_filters(query: SAQuery, filters: RecordFilterParams) -> SAQuery:
-    """RecordFilterParams 조건을 쿼리에 반영한다."""
+    """RecordFilterParams 조건을 쿼리에 반영한다. 형식이 잘못된 값은 500이 아니라 422로 거절한다."""
+    _check_text_length(filters.search, "search")
+    _check_text_length(filters.employee_name, "employee_name")
+    _check_amount_range(filters.min_gross_pay, "min_gross_pay")
+    _check_amount_range(filters.max_gross_pay, "max_gross_pay")
+
     if filters.search:
-        query = query.filter(SalaryRecord.employee_name.ilike(f"%{filters.search}%"))
+        query = query.filter(
+            SalaryRecord.employee_name.ilike(f"%{_escape_like(filters.search)}%", escape="\\")
+        )
     if filters.employee_name:
         query = query.filter(SalaryRecord.employee_name == filters.employee_name)
     if filters.start_date:
-        query = query.filter(SalaryRecord.created_at >= datetime.fromisoformat(filters.start_date))
+        query = query.filter(SalaryRecord.created_at >= _parse_iso_datetime(filters.start_date, "start_date"))
     if filters.end_date:
-        query = query.filter(SalaryRecord.created_at <= datetime.fromisoformat(filters.end_date))
+        query = query.filter(SalaryRecord.created_at <= _parse_iso_datetime(filters.end_date, "end_date"))
     if filters.min_gross_pay is not None:
         query = query.filter(SalaryRecord.gross_pay >= filters.min_gross_pay)
     if filters.max_gross_pay is not None:
@@ -95,6 +141,19 @@ def apply_record_sort(query: SAQuery, sort_by: Optional[str], sort_order: str) -
     column = column.desc() if sort_order == "desc" else column.asc()
     # 값이 같은 행이 여러 개일 때도 페이지마다 순서가 흔들리지 않도록 id를 보조 정렬 기준으로 둔다.
     return query.order_by(column, SalaryRecord.id)
+
+
+def neutralize_excel_formulas(worksheet) -> None:
+    """엑셀로 내보낼 때 "="로 시작하는 문자열(예: 직원명 "=HYPERLINK(...)")이 수식으로 저장되지 않게 한다.
+
+    openpyxl은 "="로 시작하는 값을 수식 셀로 기록하므로, 사용자가 입력한 직원명이 파일을 여는
+    사람의 PC에서 실행되는 수식이 될 수 있다(CSV/수식 인젝션). 이 시트의 숫자 컬럼은 수식이
+    아니므로, 수식으로 잡힌 셀은 모두 일반 문자열로 되돌려도 데이터가 바뀌지 않는다.
+    """
+    for row in worksheet.iter_rows():
+        for cell in row:
+            if cell.data_type == "f":
+                cell.data_type = "s"
 
 
 def serialize_record(record: SalaryRecord) -> dict:
@@ -155,19 +214,45 @@ def parse_bulk_upload_csv(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
         df["num_children_8_to_20"] = 0
 
     # bonus_pay/num_dependents/num_children_8_to_20은 선택 항목이라, 비어있거나 숫자가
-    # 아니면 기본값으로 보정한다.
+    # 아니면 기본값으로 보정한다. 다만 허용 범위를 넘는 값은 보정하지 않고 오류 행으로 보고한다
+    # (1e30 같은 값은 정수 변환 때 오버플로가 나거나 DB 정수 컬럼 범위를 넘어 저장에 실패한다).
     df["gross_pay"] = pd.to_numeric(df["gross_pay"], errors="coerce")
     df["bonus_pay"] = pd.to_numeric(df["bonus_pay"], errors="coerce").fillna(0).clip(lower=0)
     df["num_dependents"] = pd.to_numeric(df["num_dependents"], errors="coerce").fillna(1).clip(lower=1)
     df["num_children_8_to_20"] = (
         pd.to_numeric(df["num_children_8_to_20"], errors="coerce").fillna(0).clip(lower=0)
     )
+    # 숫자처럼 보이는 직원명(예: 1234)은 pandas가 숫자로 읽고, 빈 칸은 NaN이 된다.
+    df["employee_name"] = df["employee_name"].fillna("").astype(str).str.strip()
 
-    valid_mask = df["gross_pay"].notna() & (df["gross_pay"] >= 0)
-    errors = [
-        {"row": int(idx) + 2, "reason": "세전 급여(gross_pay) 값이 없거나 올바른 숫자가 아닙니다"}
-        for idx in df.index[~valid_mask]
-    ]
+    gross_ok = df["gross_pay"].notna() & (df["gross_pay"] >= 0) & (df["gross_pay"] <= MAX_PAY_AMOUNT)
+    optional_ok = (
+        (df["bonus_pay"] <= MAX_PAY_AMOUNT)
+        & (df["num_dependents"] <= MAX_DEPENDENTS)
+        & (df["num_children_8_to_20"] <= MAX_CHILDREN_8_TO_20)
+    )
+    name_ok = (df["employee_name"].str.len() <= EMPLOYEE_NAME_MAX_LENGTH) & ~df[
+        "employee_name"
+    ].str.contains(CONTROL_CHARS_RE)
+
+    valid_mask = gross_ok & optional_ok & name_ok
+    errors = []
+    for idx in df.index[~valid_mask]:
+        if not gross_ok[idx]:
+            reason = (
+                "세전 급여(gross_pay) 값이 없거나 올바른 숫자가 아니거나 "
+                f"허용 범위(0~{MAX_PAY_AMOUNT:,})를 벗어났습니다"
+            )
+        elif not optional_ok[idx]:
+            reason = (
+                f"상여금은 {MAX_PAY_AMOUNT:,} 이하, 부양가족 수는 {MAX_DEPENDENTS}명 이하, "
+                f"8~20세 자녀 수는 {MAX_CHILDREN_8_TO_20}명 이하여야 합니다"
+            )
+        else:
+            reason = (
+                f"직원명은 {EMPLOYEE_NAME_MAX_LENGTH}자 이하이고 줄바꿈 등 제어문자가 없어야 합니다"
+            )
+        errors.append({"row": int(idx) + 2, "reason": reason})
 
     valid_df = df[valid_mask].copy()
     # to_numeric/clip을 거치며 float64가 된 컬럼을 정수로 되돌린다.

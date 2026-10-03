@@ -1,8 +1,15 @@
 import { Form, Input, Modal } from "antd";
+import { BCRYPT_MAX_BYTES, utf8ByteLength } from "../limits";
 
 const NEW_PASSWORD_RULES = [
   { required: true, message: "새 비밀번호를 입력하세요" },
   { min: 8, message: "비밀번호는 최소 8자 이상이어야 합니다" },
+  {
+    validator: (_, value) =>
+      !value || utf8ByteLength(value) <= BCRYPT_MAX_BYTES
+        ? Promise.resolve()
+        : Promise.reject(new Error("비밀번호가 너무 깁니다(영문·숫자 기준 최대 72자, 한글은 24자)")),
+  },
   { pattern: /[A-Za-z]/, message: "비밀번호에 영문자를 포함해야 합니다" },
   { pattern: /\d/, message: "비밀번호에 숫자를 포함해야 합니다" },
 ];

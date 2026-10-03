@@ -66,6 +66,52 @@ describe("LoginPage", () => {
     expect(onLogin).toHaveBeenCalledWith("test-token");
   });
 
+  it("회원가입 시 형식에 맞지 않는 아이디는 서버로 보내지 않고 사유를 보여준다", async () => {
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.click(screen.getByText("회원가입"));
+    await user.type(screen.getByLabelText("아이디"), "<script>alert(1)</script>");
+    await user.type(screen.getByLabelText("비밀번호"), "pass1234");
+    await user.click(screen.getByRole("button", { name: "회원가입" }));
+
+    expect(
+      await screen.findByText("아이디에는 영문, 숫자, 한글, 밑줄(_), 마침표(.), 하이픈(-)만 사용할 수 있습니다")
+    ).toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("회원가입 시 UTF-8 72바이트를 넘는 비밀번호는 서버로 보내지 않는다", async () => {
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.click(screen.getByText("회원가입"));
+    await user.type(screen.getByLabelText("아이디"), "tester");
+    // 한글 25자는 글자 수는 적어도 75바이트라 bcrypt 한도를 넘는다.
+    await user.type(screen.getByLabelText("비밀번호"), `a1${"가".repeat(25)}`);
+    await user.click(screen.getByRole("button", { name: "회원가입" }));
+
+    expect(await screen.findByText(/비밀번호가 너무 깁니다/)).toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("로그인 화면은 아이디 형식을 검사하지 않아 과거에 가입한 아이디도 그대로 시도할 수 있다", async () => {
+    api.post.mockResolvedValueOnce({ data: { access_token: "t" } });
+    const user = userEvent.setup();
+    renderLoginPage();
+
+    await user.type(screen.getByLabelText("아이디"), "old user@mail");
+    await user.type(screen.getByLabelText("비밀번호"), "pass1234");
+    await user.click(screen.getByRole("button", { name: "로그인" }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith("/auth/login", {
+        username: "old user@mail",
+        password: "pass1234",
+      });
+    });
+  });
+
   it("로그인에 실패하면 에러 메시지를 보여주고 onLogin을 호출하지 않는다", async () => {
     api.post.mockRejectedValueOnce({ response: { status: 401 } });
     const user = userEvent.setup();

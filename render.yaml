@@ -26,6 +26,23 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+    # XSS가 발생하더라도 피해를 줄이는 다층 방어. 스크립트는 같은 출처 파일만 실행하고(인라인/외부
+    # 스크립트 차단), 요청은 우리 백엔드로만 보낼 수 있게 한다. antd가 런타임에 인라인 스타일을
+    # 주입하므로 style-src에만 'unsafe-inline'을 허용한다. 백엔드 주소(VITE_API_BASE_URL)가
+    # 바뀌면 connect-src도 함께 바꿔야 API 호출이 막히지 않는다.
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://finops-backend-scd8.onrender.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
     envVars:
       - key: VITE_API_BASE_URL
         value: https://finops-backend-scd8.onrender.com

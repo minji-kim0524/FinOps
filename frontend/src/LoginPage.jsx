@@ -1,12 +1,51 @@
 import { useState } from "react";
 import { App as AntApp, Button, Card, Form, Input, Modal, Segmented, Select } from "antd";
 import api from "./api";
+import {
+  BCRYPT_MAX_BYTES,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+  utf8ByteLength,
+} from "./limits";
+
+const isWithinBcryptLimit = (value) => !value || utf8ByteLength(value) <= BCRYPT_MAX_BYTES;
 
 const REGISTER_PASSWORD_RULES = [
   { required: true, message: "비밀번호를 입력하세요" },
   { min: 8, message: "비밀번호는 최소 8자 이상이어야 합니다" },
+  {
+    validator: (_, value) =>
+      isWithinBcryptLimit(value)
+        ? Promise.resolve()
+        : Promise.reject(new Error("비밀번호가 너무 깁니다(영문·숫자 기준 최대 72자, 한글은 24자)")),
+  },
   { pattern: /[A-Za-z]/, message: "비밀번호에 영문자를 포함해야 합니다" },
   { pattern: /\d/, message: "비밀번호에 숫자를 포함해야 합니다" },
+];
+
+// 로그인 때는 과거에 가입한 아이디도 들어와야 하므로 형식 검사는 가입 화면에서만 한다.
+const REGISTER_USERNAME_RULES = [
+  { required: true, message: "아이디를 입력하세요" },
+  {
+    min: USERNAME_MIN_LENGTH,
+    max: USERNAME_MAX_LENGTH,
+    message: `아이디는 ${USERNAME_MIN_LENGTH}~${USERNAME_MAX_LENGTH}자여야 합니다`,
+  },
+  {
+    pattern: USERNAME_PATTERN,
+    message: "아이디에는 영문, 숫자, 한글, 밑줄(_), 마침표(.), 하이픈(-)만 사용할 수 있습니다",
+  },
+];
+
+const SECURITY_ANSWER_RULES = [
+  { required: true, message: "보안 답변을 입력하세요" },
+  {
+    validator: (_, value) =>
+      isWithinBcryptLimit(value?.trim().toLowerCase())
+        ? Promise.resolve()
+        : Promise.reject(new Error("보안 답변이 너무 깁니다(영문 기준 최대 72자, 한글은 24자)")),
+  },
 ];
 
 const LOGIN_PASSWORD_RULES = [{ required: true, message: "비밀번호를 입력하세요" }];
@@ -159,9 +198,9 @@ function LoginPage({ onLogin }) {
               name="username"
               label="아이디"
               extra={mode === "register" ? "예: minji123" : undefined}
-              rules={[{ required: true, message: "아이디를 입력하세요" }]}
+              rules={mode === "register" ? REGISTER_USERNAME_RULES : [{ required: true, message: "아이디를 입력하세요" }]}
             >
-              <Input autoComplete="username" placeholder="예: minji123" />
+              <Input autoComplete="username" placeholder="예: minji123" maxLength={mode === "register" ? USERNAME_MAX_LENGTH : undefined} />
             </Form.Item>
             <Form.Item
               name="password"
@@ -184,7 +223,7 @@ function LoginPage({ onLogin }) {
                 <Form.Item
                   name="security_answer"
                   label="보안 답변"
-                  rules={[{ required: true, message: "보안 답변을 입력하세요" }]}
+                  rules={SECURITY_ANSWER_RULES}
                 >
                   <Input />
                 </Form.Item>

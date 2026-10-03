@@ -28,6 +28,16 @@ app.add_middleware(
 app.state.limiter = limiter
 
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    # API 응답이 HTML/스크립트로 해석되거나(nosniff) 다른 사이트의 프레임에 삽입되는(X-Frame-Options) 것을 막는다.
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
 @app.exception_handler(RateLimitExceeded)
 def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(

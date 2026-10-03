@@ -1,5 +1,6 @@
 import io
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -47,7 +48,9 @@ def build_payslip_pdf(record: SalaryRecord) -> bytes:
     elements = [
         Paragraph("급여명세서", title_style),
         Spacer(1, 8 * mm),
-        Paragraph(f"직원명: {record.employee_name or '-'}", info_style),
+        # Paragraph는 문자열을 <b>, <img> 같은 XML 마크업으로 해석하므로, 사용자가 입력한
+        # 직원명은 반드시 이스케이프한다(안 하면 마크업 오류로 PDF 생성이 실패하거나 태그가 실행된다).
+        Paragraph(f"직원명: {escape(record.employee_name or '-')}", info_style),
         Paragraph(f"계산일시: {record.created_at.strftime('%Y-%m-%d %H:%M')}", info_style),
         Paragraph(
             f"부양가족 수: {record.num_dependents}명 / 8~20세 자녀 수: {record.num_children_8_to_20}명",

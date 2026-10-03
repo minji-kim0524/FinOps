@@ -23,6 +23,22 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 
+def test_responses_carry_security_headers():
+    response = TestClient(app).get("/health")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+
+
+def test_error_responses_also_carry_security_headers():
+    # 인증 실패(401) 같은 오류 응답에도 같은 헤더가 붙어야 한다.
+    response = TestClient(app).get("/records")
+
+    assert response.status_code in (401, 403)
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
 def test_calculate_endpoint(client):
     response = client.post("/calculate", json={"gross_pay": 3_000_000, "num_dependents": 1})
 
@@ -222,8 +238,10 @@ def test_calculate_bulk_endpoint_allows_exactly_the_size_limit(client):
         files={"file": ("salaries.csv", csv_content, "text/csv")},
     )
 
+    # 직원명으로 바이트 수를 채운 파일이라 행 검증(직원명 길이 제한)에는 걸리지만, 이 테스트가
+    # 확인하려는 것은 "정확히 한도 크기의 파일이 크기 검사(400)에는 걸리지 않는다"는 점이다.
     assert response.status_code == 200
-    assert len(response.json()["created"]) == 1
+    assert len(response.json()["errors"]) == 1
 
 
 def test_calculate_bulk_endpoint_rejects_when_over_the_size_limit(client):

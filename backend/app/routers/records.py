@@ -1,15 +1,16 @@
 import io
 import zipfile
-from typing import Optional
+from typing import Literal, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.calculator import calculate_net_pay
 from app.database import get_db
+from app.limits import MAX_PAGE, MAX_RECORD_ID
 from app.models import SalaryRecord, User
 from app.payslip import build_payslip_pdf
 from app.schemas import SalaryInput
@@ -20,6 +21,7 @@ from app.services.records import (
     apply_record_filters,
     apply_record_sort,
     get_owned_record_or_404,
+    neutralize_excel_formulas,
     parse_bulk_upload_csv,
     save_calculated_records,
     serialize_record,
@@ -71,7 +73,8 @@ async def calculate_bulk(
 
     content = await file.read()
     try:
-        df = pd.read_csv(io.BytesIO(content))
+        # 직원명은 숫자처럼 보여도 문자열로 읽는다(안 그러면 빈 칸이 섞인 열이 실수로 읽혀 1234가 "1234.0"이 된다).
+        df = pd.read_csv(io.BytesIO(content), dtype={"employee_name": str})
     except Exception:
         raise HTTPException(status_code=400, detail="CSV 파일을 읽을 수 없습니다.")
 
@@ -103,11 +106,11 @@ def download_csv_template():
 
 @router.get("/records")
 def list_records(
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=MAX_PAGE),
     page_size: int = Query(10, ge=1, le=100),
     filters: RecordFilterParams = Depends(RecordFilterParams),
     sort_by: Optional[str] = None,
-    sort_order: str = "asc",
+    sort_order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -148,6 +151,7 @@ def export_records(
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="급여 이력")
+        neutralize_excel_formulas(writer.sheets["급여 이력"])
     buffer.seek(0)
 
     return StreamingResponse(
@@ -213,7 +217,9 @@ def employee_summary(db: Session = Depends(get_db), current_user: User = Depends
 
 @router.get("/records/{record_id}/payslip")
 def download_payslip(
-    record_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    record_id: int = Path(ge=1, le=MAX_RECORD_ID),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     record = get_owned_record_or_404(record_id, current_user.id, db)
     pdf_bytes = build_payslip_pdf(record)
@@ -227,8 +233,8 @@ def download_payslip(
 
 @router.put("/records/{record_id}")
 def update_record(
-    record_id: int,
     input: SalaryInput,
+    record_id: int = Path(ge=1, le=MAX_RECORD_ID),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -245,7 +251,9 @@ def update_record(
 
 @router.delete("/records/{record_id}")
 def delete_record(
-    record_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    record_id: int = Path(ge=1, le=MAX_RECORD_ID),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     record = get_owned_record_or_404(record_id, current_user.id, db)
 

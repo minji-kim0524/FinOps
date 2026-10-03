@@ -1,4 +1,10 @@
 import { Form, Input, InputNumber, Modal } from "antd";
+import {
+  EMPLOYEE_NAME_MAX_LENGTH,
+  MAX_CHILDREN_8_TO_20,
+  MAX_DEPENDENTS,
+  MAX_PAY_AMOUNT,
+} from "../limits";
 
 function EditRecordModal({ open, form, onOk, onCancel, onFinish }) {
   return (
@@ -12,27 +18,27 @@ function EditRecordModal({ open, form, onOk, onCancel, onFinish }) {
     >
       <Form name="edit-form" form={form} layout="vertical" onFinish={onFinish}>
         <Form.Item name="employee_name" label="직원명">
-          <Input />
+          <Input maxLength={EMPLOYEE_NAME_MAX_LENGTH} />
         </Form.Item>
         <Form.Item
           name="gross_pay"
           label="세전 급여"
           rules={[{ required: true, message: "세전 급여를 입력하세요" }]}
         >
-          <InputNumber style={{ width: "100%" }} min={0} />
+          <InputNumber style={{ width: "100%" }} min={0} max={MAX_PAY_AMOUNT} />
         </Form.Item>
         <Form.Item name="bonus_pay" label="상여금/성과급">
-          <InputNumber style={{ width: "100%" }} min={0} />
+          <InputNumber style={{ width: "100%" }} min={0} max={MAX_PAY_AMOUNT} />
         </Form.Item>
         <Form.Item
           name="num_dependents"
           label="부양가족 수"
           rules={[{ required: true, message: "부양가족 수를 입력하세요" }]}
         >
-          <InputNumber style={{ width: "100%" }} min={1} />
+          <InputNumber style={{ width: "100%" }} min={1} max={MAX_DEPENDENTS} />
         </Form.Item>
         <Form.Item name="num_children_8_to_20" label="8~20세 자녀 수">
-          <InputNumber style={{ width: "100%" }} min={0} />
+          <InputNumber style={{ width: "100%" }} min={0} max={MAX_CHILDREN_8_TO_20} />
         </Form.Item>
       </Form>
     </Modal>
