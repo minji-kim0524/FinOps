@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -14,8 +15,47 @@ from app.models import User
 
 load_dotenv()
 
-# 개발용 기본값입니다. 실제 배포 시에는 반드시 별도의 안전한 값으로 교체해야 합니다.
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+logger = logging.getLogger(__name__)
+
+# 소스에 공개된 개발용 기본값. 이 값으로 서명한 토큰은 누구나 위조할 수 있으므로 운영에서는 쓸 수 없다.
+DEV_DEFAULT_SECRET_KEY = "dev-secret-key-change-in-production"
+MIN_SECRET_KEY_LENGTH = 32
+APP_ENVIRONMENTS = ("development", "production")
+
+
+def load_secret_key() -> str:
+    """JWT 서명 비밀키를 읽는다. 운영(APP_ENV=production)에서는 안전하지 않은 설정이면 시작을 거부한다.
+
+    환경변수를 빠뜨린 채 배포하면 기본 키로 조용히 동작해 토큰 위조가 가능해지므로, 그런 배포는
+    "동작은 하지만 위험한" 상태가 아니라 "시작되지 않는" 상태가 되도록 막는다. 로컬 개발은 설정
+    없이 기본 키로 그대로 쓸 수 있다. APP_ENV 오타(예: "prod")로 이 검사가 조용히 꺼지지 않도록
+    허용된 값 외에는 시작을 거부한다.
+    """
+    environment = os.getenv("APP_ENV", "development").strip().lower()
+    if environment not in APP_ENVIRONMENTS:
+        raise RuntimeError(
+            f"APP_ENV는 {' 또는 '.join(APP_ENVIRONMENTS)} 중 하나여야 합니다(현재 값: {environment!r})."
+        )
+
+    # "JWT_SECRET_KEY="처럼 빈 값으로 남겨둔 경우도 설정하지 않은 것으로 본다.
+    secret = os.getenv("JWT_SECRET_KEY") or None
+
+    if environment == "production":
+        if secret is None:
+            raise RuntimeError("운영 환경(APP_ENV=production)에서는 JWT_SECRET_KEY를 반드시 설정해야 합니다.")
+        if secret == DEV_DEFAULT_SECRET_KEY:
+            raise RuntimeError("JWT_SECRET_KEY에 공개된 개발용 기본값을 쓸 수 없습니다. 무작위 값으로 바꾸세요.")
+        if len(secret) < MIN_SECRET_KEY_LENGTH:
+            raise RuntimeError(f"JWT_SECRET_KEY는 최소 {MIN_SECRET_KEY_LENGTH}자 이상이어야 합니다.")
+        return secret
+
+    if secret is None:
+        logger.warning("JWT_SECRET_KEY가 없어 공개된 개발용 기본 키를 사용합니다. 운영에서는 사용하지 마세요.")
+        return DEV_DEFAULT_SECRET_KEY
+    return secret
+
+
+SECRET_KEY = load_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
