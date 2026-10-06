@@ -1,10 +1,12 @@
 .app {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 20px;
+  padding: 32px max(24px, env(safe-area-inset-right)) max(48px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
   text-align: left;
 }
 
+/* 로그인 화면과 첫 로딩 중에는 화면 우상단에 고정한다. 로그인 후에는 헤더 안(.theme-toggle-inline)에 둔다. */
 .theme-toggle {
   position: fixed;
   top: 16px;
@@ -30,46 +32,8 @@
   justify-self: end;
 }
 
-.bulk-upload {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 16px 0;
-}
-
-.app :where(.ant-table-thead > tr > th, .ant-table-tbody > tr > td) {
-  white-space: nowrap;
-}
-
-/* 좁은 화면에서는 긴 버튼 라벨과 고정 폭 입력창이 페이지 자체를 가로로 넘치게 만들어서,
-   전체 필드/버튼을 세로로 쌓고 폭을 100%로 맞춘다. */
-@media (max-width: 480px) {
-  .calculate-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .calculate-form .ant-form-item {
-    margin-inline-end: 0;
-    width: 100%;
-  }
-  .calculate-form .ant-input-number,
-  .calculate-form .ant-input {
-    width: 100% !important;
-  }
-
-  .bulk-upload {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .bulk-upload .ant-btn {
-    width: 100%;
-    height: auto;
-    white-space: normal;
-    text-align: left;
-  }
-
-  /* 3분할 그리드는 h1이 길어지면 auto 칸이 밀려 가로 스크롤을 만들 수 있어, 좁은 화면에서는
-     제목과 버튼을 세로로 쌓는다. */
+/* 제목이 길어지면 양옆 칸이 버튼 폭보다 좁아져 가로로 넘치므로, 이 폭부터는 제목과 버튼을 세로로 쌓는다. */
+@media (max-width: 820px) {
   .app-header {
     grid-template-columns: 1fr;
     justify-items: center;
@@ -78,6 +42,274 @@
   .app-header > :last-child {
     grid-column: 1;
     justify-self: center;
+  }
+}
+
+.app-section {
+  margin-bottom: 16px;
+}
+.app-section-count {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* ---------- 급여 계산 폼: 넓으면 여러 칸이 한 줄에, 좁으면 한 칸씩 쌓인다 ---------- */
+.calculate-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0 16px;
+}
+.calculate-form .ant-form-item {
+  margin-bottom: 16px;
+}
+.calculate-form-submit {
+  align-self: end;
+}
+/* 충분히 넓으면 모든 입력칸과 계산 버튼을 한 줄에 둔다. */
+@media (min-width: 1100px) {
+  .calculate-form {
+    grid-template-columns: repeat(3, minmax(0, 1.3fr)) minmax(0, 0.9fr) minmax(0, 1fr) 150px;
+  }
+}
+.money-input {
+  width: 100%;
+}
+
+/* ---------- 일괄 작업 ---------- */
+.bulk-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px 32px;
+}
+.bulk-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bulk-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bulk-hint {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.bulk-buttons .ant-upload-wrapper .ant-upload {
+  display: block;
+}
+
+/* ---------- 이력 필터 ---------- */
+.record-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.record-filters-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.record-filters-search {
+  flex: 1;
+  max-width: 320px;
+}
+.record-filters-toggle {
+  display: none;
+}
+.record-filters-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.record-filters-employee {
+  width: 170px;
+}
+.record-filters-panel .money-input {
+  width: 170px;
+}
+
+/* ---------- 이력 카드 목록(넓지 않은 화면) ---------- */
+.record-card-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+.record-card-sort {
+  min-width: 170px;
+}
+.record-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.record-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.record-card-who,
+.record-card-net {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.record-card-name {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.record-card-date {
+  font-size: 13px;
+}
+.record-card-net {
+  align-items: flex-end;
+  text-align: right;
+  flex-shrink: 0;
+}
+.record-card-net strong {
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--text-h);
+}
+.record-card-summary,
+.record-card-details {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.record-card-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.record-card-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+.record-card-summary > div,
+.record-card-details > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.record-card-summary dt,
+.record-card-details dt {
+  font-size: 13px;
+  color: var(--text);
+}
+.record-card-summary dd,
+.record-card-details dd {
+  margin: 0;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+.record-card-toggle {
+  padding-inline: 0;
+  margin-top: 4px;
+}
+.record-card-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.record-card-actions .ant-btn {
+  width: 100%;
+  min-height: 40px;
+}
+.record-card-pagination {
+  margin-top: 16px;
+}
+
+/* ---------- 차트 ---------- */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 24px;
+}
+.chart-grid > section {
+  min-width: 0;
+}
+.chart-grid h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.app :where(.ant-table-thead > tr > th, .ant-table-tbody > tr > td) {
+  white-space: nowrap;
+}
+
+/* ---------- 태블릿 이하 ---------- */
+@media (max-width: 767px) {
+  .app {
+    padding: 16px max(12px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+  }
+  .app .ant-card-body {
+    padding: 16px 12px;
+  }
+
+  /* iOS Safari는 글자 크기가 16px 미만인 입력칸에 포커스하면 화면을 확대해버린다. */
+  .app input,
+  .login-page input {
+    font-size: 16px;
+  }
+
+  .record-filters-search {
+    max-width: none;
+  }
+  .record-filters-toggle {
+    display: inline-flex;
+  }
+  .record-filters-panel {
+    display: none;
+  }
+  .record-filters.is-open .record-filters-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .record-filters-employee,
+  .record-filters-dates,
+  .record-filters-reset {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .record-filters-panel .money-input {
+    width: 100%;
+  }
+}
+
+/* ---------- 휴대폰 ---------- */
+@media (max-width: 480px) {
+  .calculate-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .calculate-form .field-wide {
+    grid-column: 1 / -1;
+  }
+
+  .bulk-buttons {
+    flex-direction: column;
+  }
+  .bulk-buttons .ant-btn,
+  .bulk-buttons .ant-upload-wrapper {
+    width: 100%;
+  }
+
+  .record-card-sort {
+    width: 100%;
+  }
+}
+
+/* 터치 기기에서는 누르기 쉽도록 버튼 높이를 키운다. */
+@media (pointer: coarse) {
+  .app .ant-btn {
+    min-height: 40px;
   }
 }
 

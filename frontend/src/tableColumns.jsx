@@ -13,12 +13,28 @@ const numericColumn = (title, dataIndex, width = 120) => ({
 });
 
 export const buildSummaryColumns = (periodTitle, periodKey) => [
-  { title: periodTitle, dataIndex: periodKey, key: periodKey },
+  // 가로로 스크롤해도 어느 기간/직원의 값인지 알 수 있도록 첫 열은 고정한다.
+  { title: periodTitle, dataIndex: periodKey, key: periodKey, fixed: "left" },
   { title: "계산 건수", dataIndex: "count", key: "count", align: "right", render: (v) => v + "건" },
   { title: "총 세전 급여", dataIndex: "total_gross_pay", key: "total_gross_pay", align: "right", render: formatWon },
-  { title: "총 공제액", dataIndex: "total_deduction", key: "total_deduction", align: "right", render: formatWon },
+  // 좁은 화면(576px 미만)에서는 핵심 열(기간·건수·총 세전 급여·총 실수령액)만 남겨 가로 스크롤을 줄인다.
+  {
+    title: "총 공제액",
+    dataIndex: "total_deduction",
+    key: "total_deduction",
+    align: "right",
+    responsive: ["sm"],
+    render: formatWon,
+  },
   { title: "총 실수령액", dataIndex: "total_net_pay", key: "total_net_pay", align: "right", render: formatWon },
-  { title: "평균 실수령액", dataIndex: "avg_net_pay", key: "avg_net_pay", align: "right", render: formatWon },
+  {
+    title: "평균 실수령액",
+    dataIndex: "avg_net_pay",
+    key: "avg_net_pay",
+    align: "right",
+    responsive: ["sm"],
+    render: formatWon,
+  },
 ];
 
 export const MONTHLY_SUMMARY_COLUMNS = buildSummaryColumns("월", "month");
@@ -70,7 +86,8 @@ export function buildRecordColumns({ onEdit, onDelete, onDownloadPayslip }) {
     numericColumn("소득세", "income_tax"),
     numericColumn("지방소득세", "local_income_tax", 130),
     numericColumn("공제액 합계", "total_deduction", 140),
-    numericColumn("실수령액", "net_pay", 140),
+    // 가장 중요한 결과값이라 가로 스크롤 중에도 관리 열 옆에 항상 보이도록 오른쪽에 고정한다.
+    { ...numericColumn("실수령액", "net_pay", 140), fixed: "right" },
     {
       title: "관리",
       key: "actions",

@@ -97,7 +97,8 @@ test("상여금/성과급을 입력하면 세전 급여와 합산되어 실수�
   // 수정 모달에도 상여금 값이 그대로 채워져 있는지 확인
   await row.getByRole("button", { name: "수정" }).click();
   const editDialog = page.getByRole("dialog", { name: "계산 이력 수정" });
-  await expect(editDialog.getByLabel("상여금/성과급")).toHaveValue("1000000");
+  // 금액 입력칸은 천 단위 쉼표로 보여준다.
+  await expect(editDialog.getByLabel("상여금/성과급")).toHaveValue("1,000,000");
   await editDialog.getByRole("button", { name: "취소" }).click();
 });
 
@@ -176,7 +177,7 @@ test("보안 질문으로 비밀번호 재설정 후 새 비밀번호로 로그�
 test.describe("모바일 뷰포트", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
-  test("모바일 화면에서는 페이지 전체가 가로로 스크롤되지 않는다", async ({ page }) => {
+  test("모바일 화면에서는 이력이 카드로 보이고, 가로 스크롤 없이 상세·필터를 쓸 수 있다", async ({ page }) => {
     const username = `e2emobile${Date.now()}`;
     const password = "e2epass123";
 
@@ -194,7 +195,23 @@ test.describe("모바일 뷰포트", () => {
     await page.getByPlaceholder("직원명", { exact: true }).fill("홍길동");
     await page.getByPlaceholder("세전 급여").fill("3000000");
     await page.getByRole("button", { name: "계산하기" }).click();
-    await expect(page.getByRole("table").first().getByRole("row", { name: /홍길동/ })).toBeVisible();
+
+    // 좁은 화면에서는 14열 표 대신 핵심 금액만 먼저 보이는 카드로 보여준다.
+    const card = page.getByLabel("홍길동 급여 이력");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("2,636,093원");
+    await expect(page.getByRole("columnheader", { name: "계산일시" })).toHaveCount(0);
+
+    // 상세 내역은 눌러서 펼친다.
+    await expect(card.getByText("국민연금")).toHaveCount(0);
+    await card.getByRole("button", { name: /상세 내역 보기/ }).click();
+    await expect(card.getByText("국민연금")).toBeVisible();
+
+    // 필터는 접혀 있다가 "필터" 버튼으로 펼쳐진다.
+    const minGrossPay = page.getByPlaceholder("최소 급여");
+    await expect(minGrossPay).toBeHidden();
+    await page.getByRole("button", { name: "필터" }).first().click();
+    await expect(minGrossPay).toBeVisible();
 
     const hasHorizontalScroll = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth

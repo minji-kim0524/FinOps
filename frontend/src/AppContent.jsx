@@ -1,8 +1,9 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { App as AntApp, Button, Form, Space, Table } from "antd";
+import { App as AntApp, Button, Card, Form, Space, Table, Tabs, Typography } from "antd";
 import api from "./api";
 import { useErrorReporter } from "./hooks/useErrorReporter";
 import { useSalaryRecords } from "./hooks/useSalaryRecords";
+import { COMPACT_SCREEN_QUERY, WIDE_SCREEN_QUERY, useMediaQuery } from "./hooks/useMediaQuery";
 import {
   EMPLOYEE_SUMMARY_COLUMNS,
   MONTHLY_SUMMARY_COLUMNS,
@@ -15,13 +16,14 @@ import RecordFilters from "./components/RecordFilters";
 import EditRecordModal from "./components/EditRecordModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import SummaryTable from "./components/SummaryTable";
+import RecordCardList from "./components/RecordCardList";
 
 // recharts는 vendor 청크 하나만으로도 용량이 커서(gzip 약 110KB), 화면 하단에 있는 차트
 // 두 개에서만 쓰는 이 라이브러리를 초기 번들에서 분리해 필요할 때만 불러온다.
 const GrossPayVsNetPayChart = lazy(() => import("./components/GrossPayVsNetPayChart"));
 const MonthlyTrendChart = lazy(() => import("./components/MonthlyTrendChart"));
 
-const CHART_FALLBACK = <div style={{ height: 320 }} />;
+const chartFallback = (compact) => <div style={{ height: compact ? 260 : 320 }} />;
 
 function toSalaryPayload(values) {
   return {
@@ -37,7 +39,7 @@ function toSalaryPayload(values) {
 // 화면)을 이 파일로 분리해, App.jsx에서 지연 로딩(React.lazy)한다. 로그인 전 화면(LoginPage)은
 // 이 컴포넌트들을 전혀 쓰지 않는데도 같은 번들에 묶여 있으면 로그인 화면조차 이 무게를 그대로
 // 떠안기 때문이다.
-function AppContent({ onLogout }) {
+function AppContent({ onLogout, themeToggle }) {
   const { message, modal } = AntApp.useApp();
   const reportError = useErrorReporter({ message, onLogout });
   const salary = useSalaryRecords({ message, modal, onLogout });
@@ -48,6 +50,10 @@ function AppContent({ onLogout }) {
   const [editingRecord, setEditingRecord] = useState(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // 넓은 화면(lg 이상)은 14열 표, 그보다 좁으면 핵심 금액만 먼저 보이는 카드 목록으로 보여준다.
+  const isWideScreen = useMediaQuery(WIDE_SCREEN_QUERY);
+  const isCompactScreen = useMediaQuery(COMPACT_SCREEN_QUERY);
 
   const handleCalculate = async (values) => {
     try {
@@ -122,89 +128,153 @@ function AppContent({ onLogout }) {
     []
   );
 
+  const hasActiveFilters = Boolean(
+    salary.searchText ||
+      salary.selectedEmployee ||
+      salary.dateRange?.[0] ||
+      salary.dateRange?.[1] ||
+      salary.minGrossPay != null ||
+      salary.maxGrossPay != null
+  );
+  const emptyText = hasActiveFilters
+    ? "조건에 맞는 계산 이력이 없습니다. 필터를 조정해보세요."
+    : "아직 계산 이력이 없습니다. 위에서 급여를 계산해보세요.";
+
+  const summaryTabs = [
+    { key: "monthly", label: "월별", dataSource: salary.summary, columns: MONTHLY_SUMMARY_COLUMNS, rowKey: "month" },
+    {
+      key: "yearly",
+      label: "연도별",
+      dataSource: salary.yearlySummary,
+      columns: YEARLY_SUMMARY_COLUMNS,
+      rowKey: "year",
+    },
+    {
+      key: "employee",
+      label: "직원별",
+      dataSource: salary.employeeSummary,
+      columns: EMPLOYEE_SUMMARY_COLUMNS,
+      rowKey: "employee_name",
+    },
+  ].map(({ key, label, ...tableProps }) => ({
+    key,
+    label,
+    children: <SummaryTable {...tableProps} />,
+  }));
+
   return (
     <div className="app">
-      <div className="app-header">
+      <header className="app-header">
         <h1>급여 실수령액 계산기</h1>
-        <Space>
+        <Space wrap>
+          {themeToggle}
           <Button onClick={() => setPasswordModalOpen(true)}>비밀번호 변경</Button>
           <Button onClick={onLogout}>로그아웃</Button>
         </Space>
-      </div>
+      </header>
 
-      <CalculateForm form={form} onFinish={handleCalculate} />
+      <Card title="급여 계산" className="app-section">
+        <CalculateForm form={form} onFinish={handleCalculate} />
+      </Card>
 
-      <BulkActions
-        uploading={salary.uploading}
-        onUpload={salary.uploadBulkCsv}
-        exporting={salary.exporting}
-        onExport={salary.exportToExcel}
-        onDownloadTemplate={salary.downloadCsvTemplate}
-        downloadingPayslips={salary.downloadingPayslips}
-        onDownloadPayslipsZip={salary.downloadPayslipsZip}
-        filteredRecordCount={salary.totalRecords}
-        message={message}
-      />
+      <Card title="일괄 작업" className="app-section">
+        <BulkActions
+          uploading={salary.uploading}
+          onUpload={salary.uploadBulkCsv}
+          exporting={salary.exporting}
+          onExport={salary.exportToExcel}
+          onDownloadTemplate={salary.downloadCsvTemplate}
+          downloadingPayslips={salary.downloadingPayslips}
+          onDownloadPayslipsZip={salary.downloadPayslipsZip}
+          filteredRecordCount={salary.totalRecords}
+          message={message}
+        />
+      </Card>
 
-      <RecordFilters
-        searchText={salary.searchText}
-        onSearchTextChange={salary.setSearchText}
-        selectedEmployee={salary.selectedEmployee}
-        onSelectedEmployeeChange={salary.updateSelectedEmployee}
-        employeeOptions={salary.employeeOptions}
-        dateRange={salary.dateRange}
-        onDateRangeChange={salary.updateDateRange}
-        minGrossPay={salary.minGrossPay}
-        onMinGrossPayChange={salary.updateMinGrossPay}
-        maxGrossPay={salary.maxGrossPay}
-        onMaxGrossPayChange={salary.updateMaxGrossPay}
-        onReset={salary.resetFilters}
-      />
+      <Card
+        title={
+          <>
+            계산 이력{" "}
+            <Typography.Text type="secondary" className="app-section-count">
+              {salary.totalRecords.toLocaleString("ko-KR")}건
+            </Typography.Text>
+          </>
+        }
+        className="app-section"
+      >
+        <RecordFilters
+          searchText={salary.searchText}
+          onSearchTextChange={salary.setSearchText}
+          selectedEmployee={salary.selectedEmployee}
+          onSelectedEmployeeChange={salary.updateSelectedEmployee}
+          employeeOptions={salary.employeeOptions}
+          dateRange={salary.dateRange}
+          onDateRangeChange={salary.updateDateRange}
+          minGrossPay={salary.minGrossPay}
+          onMinGrossPayChange={salary.updateMinGrossPay}
+          maxGrossPay={salary.maxGrossPay}
+          onMaxGrossPayChange={salary.updateMaxGrossPay}
+          onReset={salary.resetFilters}
+        />
 
-      <Table
-        dataSource={salary.records}
-        columns={columns}
-        rowKey="id"
-        pagination={{
-          current: salary.page,
-          pageSize: salary.pageSize,
-          total: salary.totalRecords,
-        }}
-        onChange={(pagination, _filters, sorter) => {
-          salary.setPage(pagination.current);
-          salary.updateSort(sorter.field, sorter.order);
-        }}
-        scroll={{ x: "max-content" }}
-      />
+        {isWideScreen ? (
+          <Table
+            dataSource={salary.records}
+            columns={columns}
+            rowKey="id"
+            loading={salary.loadingRecords}
+            locale={{ emptyText }}
+            pagination={{
+              current: salary.page,
+              pageSize: salary.pageSize,
+              total: salary.totalRecords,
+              showSizeChanger: false,
+            }}
+            onChange={(pagination, _filters, sorter) => {
+              salary.setPage(pagination.current);
+              salary.updateSort(sorter.field, sorter.order);
+            }}
+            scroll={{ x: "max-content" }}
+          />
+        ) : (
+          <RecordCardList
+            records={salary.records}
+            loading={salary.loadingRecords}
+            page={salary.page}
+            pageSize={salary.pageSize}
+            total={salary.totalRecords}
+            onPageChange={salary.setPage}
+            sortBy={salary.sortBy}
+            sortOrder={salary.sortOrder}
+            onSortChange={salary.updateSort}
+            onDownloadPayslip={salary.downloadPayslip}
+            onEdit={openEditModal}
+            onDelete={handleDelete}
+            emptyText={emptyText}
+          />
+        )}
+      </Card>
 
-      <h2>세전 급여 vs 실수령액 (현재 페이지)</h2>
-      <Suspense fallback={CHART_FALLBACK}>
-        <GrossPayVsNetPayChart data={salary.records} />
-      </Suspense>
+      <Card title="급여 분석" className="app-section">
+        <div className="chart-grid">
+          <section>
+            <h3>세전 급여 vs 실수령액 (현재 페이지)</h3>
+            <Suspense fallback={chartFallback(isCompactScreen)}>
+              <GrossPayVsNetPayChart data={salary.records} compact={isCompactScreen} />
+            </Suspense>
+          </section>
+          <section>
+            <h3>월별 추이</h3>
+            <Suspense fallback={chartFallback(isCompactScreen)}>
+              <MonthlyTrendChart data={salary.summary} compact={isCompactScreen} />
+            </Suspense>
+          </section>
+        </div>
+      </Card>
 
-      <h2>월별 추이</h2>
-      <Suspense fallback={CHART_FALLBACK}>
-        <MonthlyTrendChart data={salary.summary} />
-      </Suspense>
-
-      <SummaryTable
-        title="월별 집계"
-        dataSource={salary.summary}
-        columns={MONTHLY_SUMMARY_COLUMNS}
-        rowKey="month"
-      />
-      <SummaryTable
-        title="연도별 집계"
-        dataSource={salary.yearlySummary}
-        columns={YEARLY_SUMMARY_COLUMNS}
-        rowKey="year"
-      />
-      <SummaryTable
-        title="직원별 집계"
-        dataSource={salary.employeeSummary}
-        columns={EMPLOYEE_SUMMARY_COLUMNS}
-        rowKey="employee_name"
-      />
+      <Card title="집계" className="app-section">
+        <Tabs items={summaryTabs} />
+      </Card>
 
       <EditRecordModal
         open={!!editingRecord}

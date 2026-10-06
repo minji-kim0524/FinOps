@@ -9,6 +9,7 @@ import { useRecordExports } from "./useRecordExports";
 export function useSalaryRecords({ message, modal, onLogout }) {
   const [records, setRecords] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [loadingRecords, setLoadingRecords] = useState(false);
   const [summary, setSummary] = useState([]);
   const [yearlySummary, setYearlySummary] = useState([]);
   const [employeeSummary, setEmployeeSummary] = useState([]);
@@ -17,6 +18,7 @@ export function useSalaryRecords({ message, modal, onLogout }) {
   const filters = useRecordFilters();
 
   const fetchRecords = async () => {
+    setLoadingRecords(true);
     try {
       const params = { page: filters.page, page_size: filters.pageSize, ...filters.buildFilterParams() };
       if (filters.sortBy) {
@@ -31,6 +33,8 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     } catch (err) {
       reportError(err, "계산 이력을 불러오지 못했습니다.");
       return null;
+    } finally {
+      setLoadingRecords(false);
     }
   };
 
@@ -114,6 +118,7 @@ export function useSalaryRecords({ message, modal, onLogout }) {
   return {
     records,
     totalRecords,
+    loadingRecords,
     page: filters.page,
     setPage: filters.setPage,
     pageSize: filters.pageSize,
@@ -131,6 +136,8 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     updateMinGrossPay: filters.updateMinGrossPay,
     maxGrossPay: filters.maxGrossPay,
     updateMaxGrossPay: filters.updateMaxGrossPay,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder,
     updateSort: filters.updateSort,
     uploading: exports.uploading,
     exporting: exports.exporting,
