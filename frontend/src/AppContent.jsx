@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { App as AntApp, Button, Card, Form, Space, Table, Tabs, Typography } from "antd";
 import api from "./api";
 import { useErrorReporter } from "./hooks/useErrorReporter";
@@ -17,6 +17,7 @@ import EditRecordModal from "./components/EditRecordModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import SummaryTable from "./components/SummaryTable";
 import RecordCardList from "./components/RecordCardList";
+import CalculationResult from "./components/CalculationResult";
 
 // recharts는 vendor 청크 하나만으로도 용량이 커서(gzip 약 110KB), 화면 하단에 있는 차트
 // 두 개에서만 쓰는 이 라이브러리를 초기 번들에서 분리해 필요할 때만 불러온다.
@@ -50,14 +51,33 @@ function AppContent({ onLogout, themeToggle }) {
   const [editingRecord, setEditingRecord] = useState(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [calculationResult, setCalculationResult] = useState(null);
+  const resultRef = useRef(null);
+  const historyRef = useRef(null);
 
   // 넓은 화면(lg 이상)은 14열 표, 그보다 좁으면 핵심 금액만 먼저 보이는 카드 목록으로 보여준다.
   const isWideScreen = useMediaQuery(WIDE_SCREEN_QUERY);
   const isCompactScreen = useMediaQuery(COMPACT_SCREEN_QUERY);
 
+  // 결과 패널이 화면 밖(좁은 화면에서 폼 아래)에 생겨도 바로 보이도록 스크롤한다.
+  // 움직임 줄이기를 설정한 사용자에게는 부드러운 스크롤 애니메이션을 쓰지 않는다.
+  useEffect(() => {
+    if (!calculationResult) return;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    resultRef.current?.scrollIntoView?.({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "nearest" });
+  }, [calculationResult]);
+
+  // 새 이력은 기본(등록순) 정렬에서 마지막 페이지에 들어가므로, 최근 계산순 첫 페이지로 바꿔 보여준다.
+  const handleViewInHistory = () => {
+    salary.updateSort("created_at", "descend");
+    salary.setPage(1);
+    historyRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  };
+
   const handleCalculate = async (values) => {
     try {
-      await salary.submitCalculation(toSalaryPayload(values));
+      const created = await salary.submitCalculation(toSalaryPayload(values));
+      setCalculationResult(created);
       form.resetFields();
       form.setFieldsValue({ bonus_pay: 0, num_dependents: 1, num_children_8_to_20: 0 });
       message.success("계산이 완료되었습니다.");
@@ -175,6 +195,14 @@ function AppContent({ onLogout, themeToggle }) {
 
       <Card title="급여 계산" className="app-section">
         <CalculateForm form={form} onFinish={handleCalculate} />
+        {calculationResult && (
+          <CalculationResult
+            ref={resultRef}
+            result={calculationResult}
+            onViewInHistory={handleViewInHistory}
+            onClose={() => setCalculationResult(null)}
+          />
+        )}
       </Card>
 
       <Card title="일괄 작업" className="app-section">
@@ -201,6 +229,7 @@ function AppContent({ onLogout, themeToggle }) {
           </>
         }
         className="app-section"
+        ref={historyRef}
       >
         <RecordFilters
           searchText={salary.searchText}

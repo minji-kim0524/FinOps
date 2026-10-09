@@ -22,6 +22,11 @@ test("회원가입 → 계산 → 수정 → 삭제 → 로그아웃 전체 흐�
   await page.getByPlaceholder("세전 급여").fill("3000000");
   await page.getByRole("button", { name: "계산하기" }).click();
 
+  // 계산 직후 결과가 폼 아래 패널로 바로 보인다(새 이력은 기본 정렬에서 마지막 페이지에 들어가므로).
+  const resultPanel = page.getByRole("status", { name: "계산 결과" });
+  await expect(resultPanel).toContainText("홍길동");
+  await expect(resultPanel).toContainText("2,636,093원");
+
   // 직원별 집계 표에도 같은 이름이 나오므로, 계산 이력 표(첫 번째 표)로 범위를 좁힌다.
   const historyTable = page.getByRole("table").first();
   const row = historyTable.getByRole("row", { name: /홍길동/ });

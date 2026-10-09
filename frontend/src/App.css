@@ -47,6 +47,7 @@
 
 .app-section {
   margin-bottom: 16px;
+  scroll-margin-top: 12px;
 }
 .app-section-count {
   font-size: 14px;
@@ -174,34 +175,44 @@
   color: var(--text-h);
 }
 .record-card-summary,
-.record-card-details {
+.record-card-details,
+.calculation-result-summary,
+.calculation-result-details {
   margin: 12px 0 0;
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
-.record-card-summary {
+.record-card-summary,
+.calculation-result-summary {
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
-.record-card-details {
+.record-card-details,
+.calculation-result-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px 16px;
 }
 .record-card-summary > div,
-.record-card-details > div {
+.record-card-details > div,
+.calculation-result-summary > div,
+.calculation-result-details > div {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 .record-card-summary dt,
-.record-card-details dt {
+.record-card-details dt,
+.calculation-result-summary dt,
+.calculation-result-details dt {
   font-size: 13px;
   color: var(--text);
 }
 .record-card-summary dd,
-.record-card-details dd {
+.record-card-details dd,
+.calculation-result-summary dd,
+.calculation-result-details dd {
   margin: 0;
   color: var(--text-h);
   overflow-wrap: anywhere;
@@ -222,6 +233,41 @@
 }
 .record-card-pagination {
   margin-top: 16px;
+}
+
+/* ---------- 계산 직후 결과 패널 ---------- */
+.calculation-result {
+  margin-top: 8px;
+}
+.calculation-result-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.calculation-result-name {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.calculation-result-net {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  flex-shrink: 0;
+}
+.calculation-result-net strong {
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--text-h);
+}
+.calculation-result-details {
+  margin-bottom: 12px;
+}
+@media (min-width: 768px) {
+  .calculation-result-details {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 /* ---------- 차트 ---------- */

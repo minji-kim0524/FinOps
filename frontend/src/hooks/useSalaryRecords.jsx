@@ -88,9 +88,11 @@ export function useSalaryRecords({ message, modal, onLogout }) {
     filters.sortOrder,
   ]);
 
+  // 화면이 방금 계산한 결과를 바로 보여줄 수 있도록 서버가 돌려준 이력을 그대로 반환한다.
   const submitCalculation = async (payload) => {
-    await api.post("/calculate", payload);
+    const response = await api.post("/calculate", payload);
     await refreshAll();
+    return response.data;
   };
 
   const updateRecord = async (id, payload) => {

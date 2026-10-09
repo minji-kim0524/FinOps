@@ -4,6 +4,7 @@ import { Button, Card, Empty, Pagination, Popconfirm, Select, Spin, Typography }
 import { DownOutlined, UpOutlined } from "@ant-design/icons";
 import { COMPACT_SCREEN_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 import { formatWon } from "../utils/format";
+import { DETAIL_ROWS } from "../utils/payBreakdown";
 
 // 좁은 화면에는 표 머리글의 정렬 버튼이 없으므로, 같은 정렬 조합을 선택 상자로 제공한다.
 // value는 "정렬 컬럼:방향" 형식이고, antdOrder는 useRecordFilters.updateSort가 받는 값이다.
@@ -22,17 +23,6 @@ function currentSortValue(sortBy, sortOrder) {
   const value = `${sortBy}:${sortOrder}`;
   return SORT_OPTIONS.some((option) => option.value === value) ? value : undefined;
 }
-
-const DETAIL_ROWS = [
-  ["세전 급여", "gross_pay"],
-  ["상여금/성과급", "bonus_pay"],
-  ["국민연금", "national_pension"],
-  ["건강보험", "health_insurance"],
-  ["장기요양보험", "long_term_care"],
-  ["고용보험", "employment_insurance"],
-  ["소득세", "income_tax"],
-  ["지방소득세", "local_income_tax"],
-];
 
 function RecordCard({ record, onDownloadPayslip, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
