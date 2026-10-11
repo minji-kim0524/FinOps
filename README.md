@@ -107,6 +107,14 @@ DB는 별도 설정이 없으면 SQLite(`finops.db`)를 사용합니다. 테이�
 
 `requirements-dev.txt`는 배포 이미지에는 포함되지 않는 pytest/httpx(테스트 전용)까지 포함한 로컬 개발용 목록입니다. 배포용 `requirements.txt`만 필요하다면 `pip install -r requirements.txt`를 사용하세요.
 
+**의존성 버전 고정**: `backend/constraints.txt`가 직접 쓰는 패키지와 하위 의존성까지 정확한 버전으로 고정하고, `requirements.txt`가 `-c constraints.txt`로 항상 적용합니다(설치 명령은 그대로). 고정하지 않으면 빌드할 때마다 최신 버전이 설치되어 상류 릴리스 하나로 배포가 깨지거나 로컬/CI/운영의 버전이 달라질 수 있습니다. 운영(Docker/Render)·CI는 Python 3.11이고, 보안 수정판이 3.10 이상에서만 나오는 패키지가 많아 `constraints.txt`는 Python 버전별(`python_version` 조건)로 나뉘어 있습니다. 로컬 Python이 3.9라면 수정판이 없는 구버전이 설치되므로(`pip-audit`로 확인 가능) 가능하면 로컬도 3.11로 맞추세요.
+
+의존성을 올리거나 새 패키지를 추가할 때는 `requirements.txt`를 고친 뒤 아래를 실행해 `constraints.txt`를 다시 만듭니다(Docker 필요. 운영과 같은 Linux 환경에서 3.11·3.9를 각각 해석해 합칩니다). 이후 `git diff`로 올라간 버전을 확인하고 `pytest`를 돌리세요.
+```bash
+cd backend
+scripts/update_constraints.sh
+```
+
 모델(`app/models.py`)을 수정했다면 새 마이그레이션을 생성해야 합니다.
 ```bash
 alembic revision --autogenerate -m "설명"

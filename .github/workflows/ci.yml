@@ -25,11 +25,11 @@ jobs:
           name: coverage-report
           path: backend/htmlcov/
           retention-days: 7
-      # 취약점이 있어도 빌드를 막지 않는다. requirements.txt에 버전을 고정하지 않아 항상
-      # 최신 버전을 설치하는데, 그 최신 버전에도 아직 패치가 안 나온 CVE가 있을 수 있어서
-      # (상류 라이브러리의 릴리스를 기다려야 하는 경우) 매번 CI를 빨갛게 만들면 안 되기 때문.
-      # 로그에 남겨서 새 패치가 나왔는지 주기적으로 확인하는 용도.
-      - run: pip install -q pip-audit && pip-audit -r requirements.txt || true
+      # constraints.txt에 고정된 정확한 버전을 점검한다(이 CI는 운영과 같은 Python 3.11 기준).
+      # 취약점이 발견돼도 빌드는 막지 않는다. 고정 버전은 자동으로 올라가지 않고, 수정판이 아직 안 나온
+      # CVE도 있을 수 있어 막으면 무관한 PR까지 막히기 때문. 로그를 확인해 필요하면
+      # backend/scripts/update_constraints.sh로 고정 버전을 갱신한다.
+      - run: pip install -q pip-audit && pip-audit -r constraints.txt --no-deps || true
 
   frontend-build:
     runs-on: ubuntu-latest
