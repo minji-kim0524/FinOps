@@ -14,3 +14,4 @@ pyjwt
 openpyxl
 reportlab
 slowapi
+psycopg[binary]>=3.1
