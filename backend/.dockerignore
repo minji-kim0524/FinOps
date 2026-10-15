@@ -4,3 +4,6 @@ __pycache__/
 .pytest_cache/
 finops.db
 tests/
+.env
+.env.*
+!.env.example

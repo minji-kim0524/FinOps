@@ -1,8 +1,14 @@
 venv/
+.venv/
+env/
 __pycache__/
 *.pyc
 .pytest_cache/
+# 환경변수 파일: 비밀키·DB 접속 정보 같은 실제 값이 들어가므로 커밋하지 않는다(.env.local, .env.production 등 변형 포함).
+# 형식만 보여주는 .env.example(템플릿)은 값이 없으니 예외로 커밋한다.
 .env
+.env.*
+!.env.example
 node_modules/
 *.db
 test-results/
